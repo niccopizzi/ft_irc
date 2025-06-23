@@ -1,0 +1,43 @@
+Nicknames are non-empty strings with the following restrictions:
+
+    They MUST NOT contain any of the following characters: 
+            space (' ', 0x20), 
+            comma (',', 0x2C), 
+            asterisk ('*', 0x2A), 
+            question mark ('?', 0x3F), 
+            exclamation mark ('!', 0x21), 
+            at sign ('@', 0x40).
+    They MUST NOT start with any of the following characters: 
+            dollar ('$', 0x24), 
+            colon (':', 0x3A).
+    They MUST NOT start with a character listed as a 
+            channel type, 
+            channel membership prefix, 
+            or prefix listed in the IRCv3 multi-prefix Extension.
+
+
+
+CHANNELS
+
+The channel is created implicitly when the first client joins it, 
+and the channel ceases to exist when the last client leaves it
+Channel names are strings (beginning with specified prefix characters). 
+Apart from the requirement of the first character being a valid channel type prefix character; 
+the only restriction on a channel name is that it may not contain any 
+        spaces (' ', 0x20), 
+        a control G / BELL ('^G', 0x07), 
+        or a comma (',', 0x2C) (which is used as a list item separator by the protocol).
+
+To create a new channel or become part of an existing channel, a user is to use the JOIN command. 
+ Command: JOIN
+  Parameters: <channel>{,<channel>} [<key>{,<key>}]
+
+Servers MUST process the parameters of this command as lists on incoming commands from clients,
+with the first <key> being used for the first <channel>, the second <key> being used for the second <channel>, etc
+
+f a client’s JOIN command to the server is successful, the server MUST send, in this order:
+
+    A JOIN message with the client as the message <source> and the channel they have joined as the first parameter of the message.
+    The channel’s topic (with RPL_TOPIC (332) and optionally RPL_TOPICWHOTIME (333)), and no message if the channel does not have a topic.
+    A list of users currently joined to the channel (with one or more RPL_NAMREPLY (353) numerics followed by a single RPL_ENDOFNAMES (366) numeric). 
+    These RPL_NAMREPLY messages sent by the server MUST include the requesting client that has just joined the channel.
