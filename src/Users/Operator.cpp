@@ -16,18 +16,27 @@ Operator::~Operator()
 
 void Operator::kick(Channel& channel, const Connection& client)
 {
-    
+    (void)channel;
+    (void)client;
+    std::cout << "todo\n";
 }
 
 void Operator::invite(Channel& channel, const Connection& client)
 {
-
+    (void)channel;
+    (void)client;
+    std::cout << "todo\n";
 }
+
 void Operator::topic(Channel& channel, const std::string& topic)
 {
-
+    (void)channel;
+    (void)topic;
+    std::cout << "todo\n";
 }
+
 void Operator::mode(Channel& channel)
 {
-
+    (void)channel;
+    std::cout << "todo\n";
 }

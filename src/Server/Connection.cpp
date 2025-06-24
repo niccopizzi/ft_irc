@@ -79,6 +79,11 @@ const std::string& Connection::getFullname() const
     return (user.getFullname());
 }
 
+const std::string&  Connection::getMask() const
+{
+    return (user.getMask());
+}
+
 bool    Connection::isAuthenticated() const
 {
     return (user.isAuthenticated());
@@ -89,36 +94,46 @@ bool    Connection::isRegistered() const
     return (user.isRegistered());
 }
 
-void Connection::setFd(int fd)
+void Connection::setFd(int newFd)
 {
-    if (this->fd != -1)
-        close (this->fd);
-    this->fd = fd;
+    if (fd != -1)
+        close (fd);
+    fd = newFd;
 }
 
-void Connection::setUser(User& user)
+void Connection::setUser(User& newUser)
 {
-    this->user = user;
+    user = newUser;
 }
 
 void Connection::setNickname(const std::string& nick)
 {
-    this->user.setNickname(nick);
+    user.setNickname(nick);
 }
 
 void Connection::setUsername(const std::string& username)
 {
-    this->user.setUsername(username);
+    user.setUsername(username);
 }
 
 void Connection::setFullname(const std::string& fullname)
 {
-    this->user.setFullname(fullname);
+    user.setFullname(fullname);
+}
+
+void Connection::setMask(const std::string& mask)
+{
+    user.setMask(mask);
 }
 
 void Connection::setAuth(bool auth)
 {
     user.setAuthenticate(auth);
+}
+
+void Connection::makeUserOp()
+{
+    user.becomeOp();
 }
 
 void Connection::closeConnection()
@@ -167,11 +182,11 @@ int Connection::handleClientMsg()
 
 void Connection::clearBuffer()
 {
-    std::memset(buffer, 0, bytesInBuffer);
+    std::memset(buffer, 0, bytesInBuffer - 1);
     bytesInBuffer = 0;
 }
 
-void Connection::sendMessage(const std::string& message)
+void Connection::sendMessage(const std::string& message) const
 {
     send(fd, message.data(), message.length(), 0);
 }

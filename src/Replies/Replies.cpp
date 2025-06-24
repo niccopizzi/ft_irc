@@ -72,11 +72,11 @@ const std::string Replies::PassErrReplies(int err)
 }
 
 const std::string Replies::WelcomeMsg(const std::string& nickname,
-                                        const std::string& username)
+                                        const std::string& mask)
 {
-    std::string reply = ":localhost 001 " + nickname + " Welcome to the Internet Relay Chat Network,";
+    std::string reply = ":localhost 001 " + nickname + " Welcome to the Internet Relay Chat Network!";
 
-    reply += " " + nickname + "!" + username + "@" + "localhost\r\n";
+    reply += ":" + mask + "\r\n";
 
     return (reply);
 }
@@ -98,6 +98,68 @@ const std::string Replies::PrivMsgErrReplies(const std::string& sender,
     {
         reply += "401 " + sender + " " + recipient + " :No such nick/channel\r\n";
     }
+    else if (err == ERR_CANNOTSENDTOCHAN)
+        reply += "404" + sender + " " + recipient + " :Cannot send to chan\r\n";
+    return (reply);
+}
 
+const std::string Replies::JoinWelcomeReplies(const std::string& topic,
+                                    const std::string& nickname,
+                                    const std::string& channelname,
+                                    int status)
+{
+    std::string reply;
+
+    if (status == RPL_TOPIC)
+        reply = ":localhost 332 " + nickname + " " + channelname + " :" + topic + "\r\n";
+    else if (status == RPL_ENDOFNAMES)
+        reply = ":localhost 366 " + nickname + " " + channelname + " :End of /NAMES list\r\n";
+    return (reply);
+}
+
+const std::string   Replies::JoinErrReplies(const std::string& nickname,
+                                    const std::string& chanName,
+                                    const std::string& key,
+                                    int err)
+{
+    std::string reply = ":localhost ";
+    
+    (void)key;
+    if (err == ERR_BADCHANMASK)
+    {
+        reply += "476 " + nickname;
+        if (!chanName.empty())
+            reply += " " + chanName;
+        reply += " :Bad Channel Mask\r\n";
+    }
+    else if (err == ERR_BADCHANNELKEY)
+    {
+        reply += "475 " + chanName + " :Cannot join channel (+k)\r\n";
+    }
+    else if (err == ERR_INVALIDKEY)
+    {
+        reply += "525 " + chanName + " :Key is not well-formed\r\n";
+    }
+    else if (err == ERR_INVITEONLYCHAN)
+    {
+        reply += "473 " + chanName + " :Cannot join channel (+i)\r\n";
+    }
+    return (reply);
+}
+
+const std::string Replies::KickErrReplies(const std::string& name,
+                                            const std::string& chanName,
+                                            int err)
+{
+    std::string reply = ":localhost ";
+
+    if (err == ERR_NOSUCHCHANNEL)
+    {
+        reply += "403 " + name + " " + chanName + " :No such channel\r\n";
+    }
+    else if (err == ERR_CHANOPRIVSNEEDED)
+    {
+        reply += "482 " + name + " " + chanName + " :You're not channel operator\r\n";
+    }
     return (reply);
 }

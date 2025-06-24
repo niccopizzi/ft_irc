@@ -18,6 +18,7 @@ private:
     std::string                 nickname;
     std::string                 username;
     std::string                 fullname;
+    std::string                 mask;
     Operator*                   oper;
     bool                        didAuthenticate;
 
@@ -31,13 +32,16 @@ public:
     const std::string&          getNickname() const;    
     const std::string&          getUsername() const;
     const std::string&          getFullname() const;
+    const std::string&          getMask() const;
     bool                        isAuthenticated() const;
     bool                        isRegistered() const;
+    bool                        isOp() const;
 
-    void    becomeOperator();
+    void    becomeOp();
     void    setNickname(const std::string& newNick);
     void    setUsername(const std::string& newUsername);
     void    setFullname(const std::string& newFullname);
+    void    setMask(const std::string& newMask);
     void    setAuthenticate(bool auth);
 };
 

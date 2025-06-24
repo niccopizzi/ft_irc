@@ -4,27 +4,15 @@
 #include <iostream>
 #include <vector>
 #include <map>
+#include <list>
 #include <sstream>
 #include "Listener.hpp"
 #include "../Commands/CommandHandler.hpp"
 #include "../Channels/Channel.hpp"
 
-#define TIMEOUT_TIME 60
 
-template<typename T>
-void addToVector(std::vector<T>& vec, T& t)
-{
-    for (typename std::vector<T>::iterator it = vec.begin();
-            it != vec.end(); ++it)
-    {
-        if (it->fd == -1)
-        {
-            *it = t;
-            return;
-        }
-    }
-    vec.push_back(t);
-}
+#define HOSTNAME "Sambatime"
+#define TIMEOUT_TIME 60
 
 class Server
 {
@@ -32,18 +20,22 @@ private:
     Listener                                listener;
     std::string                             password;
     std::vector<struct pollfd>              polls;
-    std::vector<Connection>                 connections;
-    std::vector<Channel>                    channels;
+    std::map<std::string, Channel>          channels;
+    std::map<int, Connection>               connections;
     std::map<std::string, Connection&>      nickToConnection;
 
     void    createConnection();
+    void    notifyQuit(const std::string& message, Connection& client) const;
     void    removeConnection(Connection& client, int index);
     void    handleClientInteraction(Connection& client, int index);
     void    handleSimpleCommand(Connection& client, 
                                 const std::string& cmd, 
-                                const std::vector<std::string>& args);
-    void    handleClientCommand(Connection& client, const std::string& msg);
+                                const std::vector<std::string>& args,
+                                int index);
+    void    handleClientCommand(Connection& client, const std::string& msg, int index);
     
+    void    printserver() const;
+
 public:
     Server(); 
     Server(const char* port, const char* password);
@@ -56,7 +48,7 @@ public:
 
     Listener&                               getListener();
     std::map<std::string, Connection&>&     getNicksMap();
-    std::vector<Connection>&                getConnections();
+    std::map<int, Connection>&              getConnections();
     std::vector<struct pollfd>&             getPolls();
 };
 

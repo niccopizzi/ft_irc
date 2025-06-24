@@ -4,6 +4,7 @@
 User::User() :  nickname(""),
                 username(""),
                 fullname(""),
+                mask(""),
                 didAuthenticate(false)
 {
     oper = NULL;
@@ -15,6 +16,7 @@ User::User() :  nickname(""),
 User::User(const std::string& nick, const std::string& uname) : nickname(nick),
                                                                 username(uname),
                                                                 fullname(""),
+                                                                mask(""),
                                                                 didAuthenticate(false)
 
 {
@@ -27,6 +29,7 @@ User::User(const std::string& nick, const std::string& uname) : nickname(nick),
 User::User(const User& user) :  nickname(user.nickname),
                                 username(user.username),
                                 fullname(user.fullname),
+                                mask(user.mask),
                                 oper(user.oper),
                                 didAuthenticate(user.didAuthenticate)
 {
@@ -41,6 +44,7 @@ User& User::operator=(const User& other)
         nickname = other.username;
         username = other.username;
         fullname = other.fullname;
+        mask = other.mask;
         didAuthenticate = other.didAuthenticate;
         if (oper != NULL)
             delete oper;
@@ -57,6 +61,7 @@ User::~User()
     nickname.clear();
     username.clear();
     fullname.clear();
+    mask.clear();
     didAuthenticate = false;
     if (oper != NULL)
         delete oper;
@@ -78,6 +83,11 @@ const std::string& User::getUsername() const
 const std::string& User::getFullname() const
 {
     return (fullname);
+}
+
+const std::string& User::getMask() const
+{
+    return (mask);
 }
 
 bool    User::isAuthenticated() const
@@ -106,12 +116,23 @@ void    User::setFullname(const std::string& newFullname)
     fullname = newFullname;
 }
 
+void    User::setMask(const std::string& newMask)
+{
+    mask = newMask;
+}
+
 void    User::setAuthenticate(bool auth)
 {
     didAuthenticate = auth;
 }
 
-void    User::becomeOperator()
+void    User::becomeOp()
 {
-    oper = new Operator();
+    if (oper == NULL)
+        oper = new Operator();
+}
+
+bool    User::isOp() const
+{
+    return (oper != NULL);
 }
