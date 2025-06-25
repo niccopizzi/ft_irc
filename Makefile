@@ -3,16 +3,16 @@ CXXFLAGS = -Wall -Wextra -std=c++98 $(INCLUDE)
 OBJ_DIR = obj/
 SRC_DIR = src/
 SRC =		$(SRC_DIR)main.cpp								\
-			$(SRC_DIR)Commands/CommandHandler.cpp			\
-			$(SRC_DIR)Channels/Channel.cpp					\
-			$(SRC_DIR)Replies/Replies.cpp					\
-			$(SRC_DIR)Server/Server.cpp 					\
-			$(SRC_DIR)Server/Listener.cpp					\
-			$(SRC_DIR)Server/Connection.cpp 				\
-			$(SRC_DIR)StartFunctions/ArgumentsChecker.cpp	\
-			$(SRC_DIR)StartFunctions/ServerStarter.cpp		\
-			$(SRC_DIR)Users/User.cpp						\
-			$(SRC_DIR)Users/Operator.cpp					\
+			$(SRC_DIR)commands/CommandHandler.cpp			\
+			$(SRC_DIR)channel/Channel.cpp					\
+			$(SRC_DIR)replies/Replies.cpp					\
+			$(SRC_DIR)server/Server.cpp 					\
+			$(SRC_DIR)server/Listener.cpp					\
+			$(SRC_DIR)server/Connection.cpp 				\
+			$(SRC_DIR)start_func/args_check.cpp				\
+			$(SRC_DIR)start_func/server_start.cpp			\
+			$(SRC_DIR)user/User.cpp							\
+			$(SRC_DIR)signals/signals.cpp					
 			
 
 OBJ = $(addprefix $(OBJ_DIR), $(SRC:.cpp=.o))

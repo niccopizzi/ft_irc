@@ -2,7 +2,8 @@
 #define IRC_HPP
 
 #include <iostream>
-#include "Server/Server.hpp"
+#include "server/Server.hpp"
+#include "signals/signals.hpp"
 
 bool    areArgsValid(int argc, char* argv[]);
 void    startServer(char* port, char* password);
