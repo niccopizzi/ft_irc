@@ -13,7 +13,10 @@ const std::string Replies::CommonErrReplies(const std::string& nickname,
     }
     else if (err == ERR_NEEDMOREPARAMS)
     {
-        reply += " 461 " + command + " :Not enough parameters\r\n";
+        reply += " 461 ";
+        if (!nickname.empty())
+            reply += nickname + " ";
+        reply += command + " :Not enough parameters\r\n";
     }
     return (reply);
 }
@@ -42,13 +45,13 @@ const std::string Replies::NickErrReplies(const std::string& nickname,
     return (reply);
 }
 
-const std::string Replies::UserErrReplies(int err)
+const std::string Replies::UserErrReplies(const std::string& nickname, int err)
 {
     std::string reply = ":localhost ";
 
     if (err == ERR_NEEDMOREPARAMS)
     {
-        return (Replies::CommonErrReplies("", "USER", ERR_NEEDMOREPARAMS));
+        return (Replies::CommonErrReplies(nickname, "USER", ERR_NEEDMOREPARAMS));
     }
     else if (err == ERR_ALREADYREGISTERED)
     {
@@ -74,7 +77,7 @@ const std::string Replies::PassErrReplies(int err)
 const std::string Replies::WelcomeMsg(const std::string& nickname,
                                         const std::string& mask)
 {
-    std::string reply = ":localhost 001 " + nickname + " Welcome to the Internet Relay Chat Network!";
+    std::string reply = ":localhost 001 " + nickname + " Welcome to the Internet Relay Chat Network! ";
 
     reply += ":" + mask + "\r\n";
 
@@ -134,20 +137,21 @@ const std::string   Replies::JoinErrReplies(const std::string& nickname,
     }
     else if (err == ERR_BADCHANNELKEY)
     {
-        reply += "475 " + chanName + " :Cannot join channel (+k)\r\n";
+        reply += "475 " + nickname + " " + chanName + " :Cannot join channel (+k)\r\n";
     }
     else if (err == ERR_INVALIDKEY)
     {
-        reply += "525 " + chanName + " :Key is not well-formed\r\n";
+        reply += "525 " + nickname + " " + chanName + " :Key is not well-formed\r\n";
     }
     else if (err == ERR_INVITEONLYCHAN)
     {
-        reply += "473 " + chanName + " :Cannot join channel (+i)\r\n";
+        reply += "473 " + nickname + " " + chanName + " :Cannot join channel (+i)\r\n";
     }
     return (reply);
 }
 
 const std::string Replies::KickErrReplies(const std::string& name,
+                                            const std::string& toKick,
                                             const std::string& chanName,
                                             int err)
 {
@@ -161,5 +165,33 @@ const std::string Replies::KickErrReplies(const std::string& name,
     {
         reply += "482 " + name + " " + chanName + " :You're not channel operator\r\n";
     }
+    else if (err == ERR_NOSUCHNICK)
+    {
+        reply += "401 " + name + " " + toKick + " :No such nick/channel\r\n"; 
+    }
+    else if (err == ERR_USERNOTINCHANNEL)
+    {
+        reply += "441 " + name + " " + toKick + " " + chanName + " :They aren't on that channel\r\n";
+    }
     return (reply);
+}
+
+const std::string Replies::InviteErrReplies(const std::string& nickname,
+                                            const std::string& invited, 
+                                            const std::string& channel,   
+                                            int err)
+{
+    std::string reply = ":localhost ";
+
+    if (err == ERR_NOSUCHNICK)
+        reply += "401 " + nickname + " " + invited + " :No such nick/channel\r\n";
+    else if (err == ERR_NOSUCHCHANNEL)
+        reply += "403" + nickname, + " " + channel + " :No such channel\r\n";
+    else if (err == ERR_NOTONCHANNEL)
+        reply += "442 " + nickname + " " + channel + " :You are not on that channel\r\n";
+    else if (err == ERR_USERONCHANNEL)
+        reply += "443" + nickname + " " + invited + " " + channel + " :is already on channel\r\n";
+    else if (err == ERR_CHANOPRIVSNEEDED)
+        reply += "482 " + nickname + " " + channel + " :You're not channel operator\r\n";
+    return (reply); 
 }

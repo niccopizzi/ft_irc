@@ -104,11 +104,15 @@ bool    User::isRegistered() const
 void    User::setNickname(const std::string& newNick)
 {
     nickname = newNick;
+    if (isRegistered())
+        mask = nickname + "!" + username + "@localhost";
 }
 
 void    User::setUsername(const std::string& newUsername)
 {
     username = newUsername; 
+    if (isRegistered())
+        mask = nickname + "!" + username + "@localhost";
 }
 
 void    User::setFullname(const std::string& newFullname)

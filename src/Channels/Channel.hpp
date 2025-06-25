@@ -7,10 +7,6 @@
 #include "../Server/Connection.hpp"
 #include "../Replies/Replies.hpp"
 
-
-#define NOT_INVITED 0
-#define INVITED 1
-
 #define INVITE_ONLY     1
 #define TOPIC_RESTRICT  (1 << 1)
 #define KEY_SET         (1 << 2)
@@ -20,12 +16,13 @@
 class Channel
 {
 private:
-    std::string                         name;
-    std::string                         topic;
-    std::string                         key;
-    int                                 mode;
-    std::map<std::string, const Connection&>  members;
-    std::map<std::string, const Connection&>  operators;
+    std::string                                         name;
+    std::string                                         topic;
+    std::string                                         key;
+    int                                                 mode;
+    std::map<const std::string&, const Connection&>     members;
+    std::map<const std::string&, const Connection&>     operators;
+    std::vector<const Connection*>                      usersInvited; //keep track of invited uers
     
     void    sendListofNames(const Connection& client) const;
 
@@ -38,19 +35,21 @@ public:
 
     const std::string&      getName() const;
     const std::string&      getTopic() const;
+    const std::string&      getKey() const;
     int                     getMode() const;
 
-    const std::map<std::string, const Connection&>&     getMembers() const;
-    const std::map<std::string, const Connection&>&     getOperators() const;
+    const std::map<const std::string&, const Connection&>&     getMembers() const;
+    const std::map<const std::string&, const Connection&>&     getOperators() const;
 
     void    setMode(int flags);
     void    setTopic(const std::string& topic);
     void    setName(const std::string& name);
+    void    storeUserInvitation(const Connection* invitee);
     int     addMember(const Connection& client,
-                    const std::string& providedKey,
-                    bool invited);
+                    const std::string& providedKey);
     void    removeMember(const std::string& nickname);
     
+    std::vector<const Connection*>::iterator    getInvitePos(const Connection* user);
     bool    isEmpty() const;
     bool    isUserInChannel(const std::string& nickname) const;
     bool    isUserOperator(const std::string& nickname) const;

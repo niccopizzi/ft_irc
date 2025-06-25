@@ -16,7 +16,9 @@
 #define ERR_NONICKNAMEGIVEN     431
 #define ERR_ERRONEUSNICKNAME    432
 #define ERR_NICKNAMEINUSE       433
+#define ERR_USERNOTINCHANNEL    441 
 #define ERR_NOTONCHANNEL        442
+#define ERR_USERONCHANNEL       443 
 #define ERR_NOTREGISTERED       451
 #define ERR_NEEDMOREPARAMS      461
 #define ERR_ALREADYREGISTERED   462
@@ -40,7 +42,7 @@ public:
                                     const std::string& chanName,
                                     const std::string& key,
                                     int err); 
-    static const std::string UserErrReplies(int err);
+    static const std::string UserErrReplies(const std::string& nickname, int err);
     static const std::string PrivMsgErrReplies(const std::string& sender, 
                                                 const std::string& recipient,
                                                 int err);
@@ -48,11 +50,16 @@ public:
     static const std::string WelcomeMsg(const std::string& nickname,
                                         const std::string& mask);
     static const std::string KickErrReplies(const std::string& name,
+                                            const std::string& toKick,
                                             const std::string& chanName,
                                             int err);
     static const std::string CommonErrReplies(const std::string& nickname, 
                                                 const std::string& command,
                                                 int err);
+    static const std::string InviteErrReplies(const std::string& nickname,
+                                            const std::string& invited,
+                                            const std::string& channel,
+                                            int err);
 
 };
 

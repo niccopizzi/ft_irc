@@ -19,20 +19,25 @@ class Server
 private:
     Listener                                listener;
     std::string                             password;
-    std::vector<struct pollfd>              polls;
+    std::vector<pollfd>                     polls;
+    std::list<Connection>                   connections;
     std::map<std::string, Channel>          channels;
-    std::map<int, Connection>               connections;
-    std::map<std::string, Connection&>      nickToConnection;
+    std::map<int, Connection&>              fdToConnection;
+    std::map<const std::string&, Connection&>     nickToConnection;
 
     void    createConnection();
-    void    notifyQuit(const std::string& message, Connection& client) const;
-    void    removeConnection(Connection& client, int index);
-    void    handleClientInteraction(Connection& client, int index);
-    void    handleSimpleCommand(Connection& client, 
+    void    registerConnection(Connection& newConnection,
+                                const pollfd& connectionPoll);
+    void    deregisterConnection(Connection& client, pollfd& clientPoll);
+    void    removeClientFromChannels(const std::string& nickname);
+    void    notifyQuit(const std::string& message, const Connection& client) const;
+    void    removeConnection(Connection& client, pollfd& clientPoll);
+    void    handleClientInteraction(pollfd& activePoll);
+    void    handleSimpleCommand(Connection& client,
+                                pollfd& clientPoll, 
                                 const std::string& cmd, 
-                                const std::vector<std::string>& args,
-                                int index);
-    void    handleClientCommand(Connection& client, const std::string& msg, int index);
+                                const std::vector<std::string>& args);
+    void    handleClientCommand(Connection& client, pollfd& clientPoll, const std::string& msg);
     
     void    printserver() const;
 
@@ -46,10 +51,13 @@ public:
     void    openPort();
     void    pollEvents();
 
-    Listener&                               getListener();
-    std::map<std::string, Connection&>&     getNicksMap();
-    std::map<int, Connection>&              getConnections();
-    std::vector<struct pollfd>&             getPolls();
+    const Listener&                               getListener() const;
+    const std::list<Connection>&                  getConnections() const;
+    const std::map<const std::string&, Connection&>&    getNicksMap() const;
+    const std::map<int, Connection&>&             getFdMap()    const;
+    const std::vector<pollfd>&                    getPolls()    const;
 };
+
+std::string getReason(const std::vector<std::string>& args);
 
 #endif // SERVER.HPP

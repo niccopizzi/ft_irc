@@ -28,7 +28,7 @@ bool    isNickValid(const std::string& nick)
 }
 
 bool    isNickUsed(const std::string& nickName,
-                const std::map<std::string, Connection&>& nickToConnection)
+                const std::map<const std::string&, Connection&>& nickToConnection)
 {
     return (nickToConnection.find(nickName) != nickToConnection.end());
 }
@@ -52,7 +52,7 @@ void CommandHandler::notifyUsersInClientChannels(const std::string& message,
 
 void CommandHandler::executeNick(const std::string& nickname, 
                                 Connection& client,
-                                std::map<std::string, Connection&>& nickToConnection,
+                                std::map<const std::string&, Connection&>& nickToConnection,
                                 std::map<std::string, Channel>& channels)
 {
     if (!client.isAuthenticated())
@@ -72,18 +72,16 @@ void CommandHandler::executeNick(const std::string& nickname,
             client.sendMessage(":" + client.getMask() +  " NICK :" + nickname + "\r\n");
             notifyUsersInClientChannels(":" + client.getMask() +  " NICK :" + nickname + "\r\n", channels, client);
             client.setNickname(nickname);
-            client.setMask(nickname + "!" + client.getUsername() + "@localhost");
         }
         else 
         {
             client.setNickname(nickname);
             if (client.isRegistered())
             {
-                client.setMask(client.getNickname() + "!" + client.getUsername() + "@localhost");
                 client.sendMessage(Replies::WelcomeMsg(nickname, client.getMask()));
             }
+            nickToConnection.insert(std::pair<const std::string&, Connection&>(client.getNickname(), client));
         }
-        nickToConnection.insert(std::pair<std::string, Connection&>(nickname, client));
     }
 }
 
@@ -119,16 +117,19 @@ void CommandHandler::executePing(const std::string& token,
 std::string    catArguments(std::vector<std::string>::const_iterator begin,
                             std::vector<std::string>::const_iterator end)
 {
-    std::string ret;
+    std::string ret("");
 
-    for (; begin != end;)
+    if ((end - 1)->empty())
+        end = end - 1;
+    while (begin != end)
     {
-        ret += *begin + " ";
+        ret += *begin;
+        ++begin;
+        if ((begin) != end)
+            ret += " ";
     }
     if (ret.at(0) == ':')
         ret.erase(0, 1);
-    ret.erase(ret.size() - 1, 1);
-    std::cout << "message after cat : " << ret << "---\n";
     return (ret);
 }
 
@@ -156,10 +157,10 @@ void sendChannelMessage(Connection& sender,
 
 void CommandHandler::executePrivMsg(const std::vector<std::string>& args, 
                                 Connection& client,
-                                std::map<std::string, Connection&>& nickToConnection,
+                                std::map<const std::string&, Connection&>& nickToConnection,
                                 std::map<std::string, Channel>& channels)
 {
-    std::map<std::string, Connection&>::iterator targetClient;
+    std::map<const std::string&, Connection&>::iterator targetClient;
     std::map<std::string, Channel>::iterator targetChannel;
     std::string  target;
 
@@ -202,11 +203,11 @@ void CommandHandler::executeUsername(const std::vector<std::string>& args,
         client.sendMessage("You need to authenticate first!\n");
     else if (args.size() < 4)
     {
-        client.sendMessage(Replies::UserErrReplies(ERR_NEEDMOREPARAMS)); 
+        client.sendMessage(Replies::UserErrReplies(client.getNickname(), ERR_NEEDMOREPARAMS)); 
     }
     else if (client.isRegistered())
     {
-        client.sendMessage(Replies::UserErrReplies(ERR_ALREADYREGISTERED));
+        client.sendMessage(Replies::UserErrReplies(client.getNickname(), ERR_ALREADYREGISTERED));
     }
     else
     {
@@ -214,7 +215,6 @@ void CommandHandler::executeUsername(const std::vector<std::string>& args,
         client.setFullname(catArguments(args.begin() + 3, args.end()));
         if (client.isRegistered())
         {
-            client.setMask(client.getNickname() + "!" + client.getUsername() + "@localhost");
             client.sendMessage(Replies::WelcomeMsg(client.getNickname(), client.getMask()));
         }
     }
@@ -289,7 +289,7 @@ void    handleJoinArgs(const std::vector<std::string>& channelNames,
         it = channels.find(chanName);
         if (it != channels.end())
         {
-            if (it->second.addMember(client, chanKey, NOT_INVITED) < 0)
+            if (it->second.addMember(client, chanKey) < 0)
                 return;
         }
         else
@@ -317,17 +317,119 @@ void    CommandHandler::executeJoin(
     handleJoinArgs(channelNames, channelKeys, channels, client);
 }
 
+
+void    removeUsers(std::vector<std::string>& usersToKick,
+                    const std::string& reason,
+                    Channel& channel, 
+                    Connection& kicker,
+                    std::map<const std::string&, Connection&> nickToConnection)
+{
+    std::map<const std::string&, Connection&>::iterator toKick;
+    std::string theReason;
+    std::string message = ":" + kicker.getMask() + " KICK " + channel.getName() + " ";
+
+    for (std::vector<std::string>::iterator it = usersToKick.begin(); it != usersToKick.end(); ++it)
+    {
+        toKick = nickToConnection.find(*it);
+        if (toKick == nickToConnection.end())
+        {
+            kicker.sendMessage(Replies::KickErrReplies(kicker.getNickname(), *it, channel.getName(), ERR_NOSUCHNICK));
+            return;
+        }
+        else if (!channel.isUserInChannel(toKick->first))
+        {
+            kicker.sendMessage(Replies::KickErrReplies(kicker.getNickname(), *it, channel.getName(), ERR_USERNOTINCHANNEL));
+            return;
+        }
+        else
+        {
+            theReason = reason.empty() ? *it : reason;
+            channel.broadCastMessage(message + *it + " :" + (theReason) + "\r\n", kicker);
+            kicker.sendMessage(message + *it + theReason + "\r\n");
+            channel.removeMember(toKick->first);
+        }
+    }
+}
+
 void CommandHandler::executeKick(const std::vector<std::string>& args,
                             Connection& kicker,
-                            std::map<std::string, Channel>& channels)
+                            std::map<std::string, Channel>& channels,
+                            std::map<const std::string&, Connection&> nickToConnection)
 {
     std::map<std::string, Channel>::iterator it;
+    std::vector<std::string>  usersToKick;
+
+    usersToKick.reserve(5);
     if (args.size() < 2)
         kicker.sendMessage(Replies::CommonErrReplies(kicker.getNickname(), "KICK", ERR_NEEDMOREPARAMS));
     else if ((it = channels.find(args.at(0))) == channels.end())
-        kicker.sendMessage(Replies::KickErrReplies(kicker.getNickname(), args.at(0), ERR_NOSUCHCHANNEL));
+        kicker.sendMessage(Replies::KickErrReplies(kicker.getNickname(), "", args.at(0), ERR_NOSUCHCHANNEL));
     else if (!it->second.isUserInChannel(kicker.getNickname()))
-        kicker.sendMessage(Replies::KickErrReplies(kicker.getNickname(), it->first, ERR_NOTONCHANNEL));
+        kicker.sendMessage(Replies::KickErrReplies(kicker.getNickname(), "", it->first, ERR_NOTONCHANNEL));
     else if (!it->second.isUserOperator(kicker.getNickname()))
-        kicker.sendMessage(Replies::KickErrReplies(kicker.getNickname(), it->first, ERR_CHANOPRIVSNEEDED));
+        kicker.sendMessage(Replies::KickErrReplies(kicker.getNickname(), "", it->first, ERR_CHANOPRIVSNEEDED));
+    else
+    {
+        usersToKick = splitValues(args.at(1));
+        if (args.size() >= 3 && !args.at(2).empty())
+        {
+            std::string reason = catArguments(args.begin() + 2, args.end());
+            removeUsers(usersToKick, reason, it->second, kicker, nickToConnection);
+        }
+        else
+            removeUsers(usersToKick, "", it->second, kicker, nickToConnection);
+        if (it->second.isEmpty())
+            channels.erase(it->first); //remove channel if the last users kicked himself out
+    }
+}
+
+void    handleInvitation(const Connection& inviter,
+                        Channel& channel, Connection& userInvited)
+{
+    channel.storeUserInvitation(&userInvited);
+    inviter.sendMessage(":" + inviter.getMask() + " INVITE " + userInvited.getNickname() + " " + channel.getName() + "\r\n");
+    userInvited.sendMessage(":" + inviter.getMask() + " INVITE " + userInvited.getNickname() + " " + channel.getName() + "\r\n");
+
+}
+
+void CommandHandler::executeInvite(const std::vector<std::string>& args,
+                            Connection& inviter,
+                            std::map<std::string, Channel>& channels,
+                            std::map<const std::string&, Connection&>& nickToConnection)
+{
+    std::map<std::string, Channel>::iterator            targetChan;
+    std::map<const std::string&, Connection&>::iterator targetClient;
+
+    if (args.size() < 2)
+    {
+        inviter.sendMessage(Replies::CommonErrReplies(inviter.getNickname(), "INVITE", ERR_NEEDMOREPARAMS));
+        return;
+    }
+    targetClient = nickToConnection.find(args.at(0));
+    if (targetClient == nickToConnection.end())
+    {
+        inviter.sendMessage(Replies::InviteErrReplies(inviter.getNickname(), args.at(0), "", ERR_NOSUCHNICK));
+    }
+    targetChan = channels.find(args.at(1));
+    if (targetChan == channels.end())
+    {
+        inviter.sendMessage(Replies::InviteErrReplies(inviter.getNickname(), "", args.at(1), ERR_NOSUCHCHANNEL));
+        return;
+    }
+    if (!targetChan->second.isUserInChannel(inviter.getNickname()))
+    {
+        inviter.sendMessage(Replies::InviteErrReplies(inviter.getNickname(), "", args.at(1), ERR_NOTONCHANNEL));
+        return;
+    }
+    if (targetChan->second.isUserInChannel(targetClient->first))
+    {
+        inviter.sendMessage(Replies::InviteErrReplies(inviter.getNickname(), targetClient->first, targetChan->first, ERR_USERONCHANNEL));
+        return;
+    }
+    if ((targetChan->second.getMode() & INVITE_ONLY) && !targetChan->second.isUserOperator(inviter.getNickname()))
+    {
+        inviter.sendMessage(Replies::InviteErrReplies(inviter.getNickname(), targetClient->first, targetChan->first, ERR_CHANOPRIVSNEEDED));
+        return;
+    }
+    handleInvitation(inviter, targetChan->second, targetClient->second);
 }

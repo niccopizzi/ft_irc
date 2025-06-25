@@ -21,7 +21,9 @@ Server::Server(const char* port, const char* password) :    listener(port),
 Server::Server(const Server& server) :  listener(server.listener), 
                                         password(server.password),
                                         polls(server.polls), 
+                                        connections(server.connections),
                                         channels(server.channels),
+                                        fdToConnection(server.fdToConnection),
                                         nickToConnection(server.nickToConnection)
 {
     #ifdef DEBUG
@@ -36,7 +38,9 @@ Server& Server::operator=(const Server& other)
         listener = other.listener;
         password = other.password;
         polls = other.polls;
+        connections = other.connections;
         channels = other.channels;
+        fdToConnection = other.fdToConnection;
         nickToConnection = other.nickToConnection;
     }
     #ifdef DEBUG
@@ -62,29 +66,34 @@ Server::~Server()
     #endif
 }
 
-Listener& Server::getListener()
+const Listener& Server::getListener() const
 {
     return (listener);
 }
 
-std::map<int, Connection>& Server::getConnections()
+const std::list<Connection>& Server::getConnections() const
 {
     return (connections);
 }
 
-std::vector<struct pollfd>& Server::getPolls()
+const std::vector<pollfd>& Server::getPolls() const
 {
     return (polls);
 }
 
-std::map<std::string, Connection&>& Server::getNicksMap()
+const std::map<const std::string&, Connection&>& Server::getNicksMap() const
 {
     return (nickToConnection);
 }
 
+const std::map<int, Connection&>&  Server::getFdMap() const
+{
+    return (fdToConnection);
+}
+
 void Server::openPort()
 {
-    struct pollfd listenerpoll;
+    pollfd listenerpoll;
     
     listener.createSocket(AF_UNSPEC, SOCK_STREAM);
     listener.startListen(SOMAXCONN);
@@ -100,15 +109,16 @@ void Server::printserver() const
     
     std::cout << "CONNECTIONS\n";
     int index = 0;
-    for (std::map<int, Connection>::const_iterator it = connections.begin();
+    for (std::list<Connection>::const_iterator it = connections.begin();
         it != connections.end(); ++it)
     {
         std::cout << "\tConnection number : " << index <<'\n';
-        std::cout << "\tConnection address : " << &(it->second) << '\n';
-        std::cout << "\tfd                -> " << it->first << '\n';
-        std::cout << "\tNickName          -> " << it->second.getNickname() << '\n';
-        std::cout << "\tUsername          -> " << it->second.getUsername() << '\n';
-        std::cout << "\tRegistered        -> " << (it->second.isRegistered() ? "Yes" : "No") << '\n';
+        std::cout << "\tConnection address : " << &(*it) << '\n';
+        std::cout << "\tfd                -> " << it->fd << '\n';
+        std::cout << "\tNickName          -> " << it->getNickname() << '\n';
+        //std::cout << "\tNickName address  -> " << &it->getNickname() << '\n';
+        std::cout << "\tUsername          -> " << it->getUsername() << '\n';
+        std::cout << "\tRegistered        -> " << (it->isRegistered() ? "Yes" : "No") << '\n';
         index++;
     }
     index = 0;
@@ -117,10 +127,11 @@ void Server::printserver() const
     {
         std::cout << "\tChannel number : " << index <<'\n';
         std::cout << "\tChannel name   -> " << ct->first <<'\n';
+        std::cout << "\tChannle key    -> " << ct->second.getKey() << '\n';
         std::cout << "\tChannel members\n" <<'\n';
         int memnum = 0;
-        const std::map<std::string, const Connection&>& members = ct->second.getMembers();
-        for (std::map<std::string, const Connection&>::const_iterator member = members.begin();
+        const std::map<const std::string&, const Connection&>& members = ct->second.getMembers();
+        for (std::map<const std::string&, const Connection&>::const_iterator member = members.begin();
             member != members.end(); ++member)
         {
             std::cout << "\t\tMember number    : " << memnum << '\n';
@@ -131,126 +142,72 @@ void Server::printserver() const
             std::cout << "\t\tRegistered      -> " << (member->second.isRegistered() ? "yes" : "no") << '\n';
             memnum++;
         }
+    }/* 
+    std::cout << "\nFDTOCONNECTION\n";
+    for (std::map<int, Connection&>::const_iterator it = fdToConnection.begin(); it != fdToConnection.end(); ++it)
+    {
+        std::cout << "\tFd                  -> " << it->first << '\n';
+        std::cout << "\tNickname            -> " << it->second.getNickname() << '\n';
+        std::cout << "\tUsername            -> " << it->second.getUsername() << '\n';
+        std::cout << "\tConnection address  ->" << &it->second << '\n';
     }
+    std::cout << "\nNICKTOCONNECTION\n";
+    for (std::map<const std::string&, Connection&>::const_iterator it = nickToConnection.begin(); it != nickToConnection.end(); ++it)
+    {
+        std::cout << "\tFd                  -> " << it->second.fd << '\n';
+        std::cout << "\tNickname            -> " << it->first << '\n';
+        std::cout << "\tUsername            -> " << it->second.getUsername() << '\n';
+        std::cout << "\tNickname ref        -> " << &it->first << '\n';
+    } */
 }
 
 void Server::pollEvents()
 {
     int     ret;
-    size_t  pollsSize;
-
-    pollsSize = polls.size();
-    ret = poll(polls.data(), pollsSize, -1);
+    
+    ret = poll(polls.data(), polls.size(), -1);
     if (ret == -1)  
         throw (std::runtime_error(strerror(errno)));
-    for (size_t i = 0; i < pollsSize; ++i)
+    for (size_t i = 0; i < polls.size(); ++i)
     {
         if (polls.at(i).revents != 0)
         {
             if (i == 0)
                 createConnection();
             else
-                handleClientInteraction(connections.find(polls.at(i).fd)->second, i);
+                handleClientInteraction(polls.at(i));
         }
     }
     printserver();
 }
 
-void Server::createConnection()
+void Server::handleClientInteraction(pollfd& activePoll)
 {
-    try
-    {
-        Connection      newConnection(listener.acceptConnection());
-        struct pollfd   newPollFd;
+    int             res;
 
-        newPollFd.fd = newConnection.getFd();
-        newPollFd.events = POLLIN;
-        newPollFd.revents = 0;
-        
-        connections.insert(std::pair<int, Connection>(newPollFd.fd, newConnection));
-        polls.push_back(newPollFd);
-    }
-    catch(const std::exception& e)
+    if (activePoll.events & POLLHUP)
+        std::cout << "client closed connection\n";
+    else if (activePoll.events & POLLIN)
     {
-        std::cerr << e.what() << '\n';
-    }
-}
-
-void Server::removeConnection(Connection& client, int index)
-{
-    int clientFd;
-    const std::string        clientNickname = client.getNickname();
-    std::map<std::string, Channel>::iterator it;
-    std::map<std::string, Channel>::iterator next;
-
-    it = channels.begin();
-    next = it;
-    for (; it != channels.end(); it = next)
-    {
-        ++next;
-        if (it->second.isUserInChannel(clientNickname))
+        Connection& client = fdToConnection.find(activePoll.fd)->second;    
+        res = client.handleClientMsg();
+        if (res == BUFFER_FULL)
+            std::cout << "Todo : message bigger than 512 bytes\n"; //https://modern.ircdocs.horse/#errinputtoolong-417
+        else if (res == READ_ERROR)
+            std::cout << "Reading error : " << strerror(errno) << '\n';
+        else if (res == CONNECTION_CLOSED)
         {
-            it->second.removeMember(clientNickname);
-            if (it->second.isEmpty()) //delete channel if it's empty
-                channels.erase(it);
+            notifyQuit(client.getNickname() + " closed connection\n", client);
+            removeConnection(client, activePoll);
         }
+        else if (res == ENDLINE_RECEIVED)
+            handleClientCommand(client, activePoll, client.buffer);
     }
-    clientFd = client.getFd();
-    polls.erase(polls.begin() + index);
-    client.closeConnection();
-    nickToConnection.erase(clientNickname);
-    connections.erase(clientFd);
+    else
+        std::cout << "What? Event received -> " << activePoll.events << '\n';
 }
 
-std::string getReason(const std::vector<std::string>& args)
-{
-    std::string theReason("");
-
-    if (args.size() < 2)
-        return (theReason);
-    theReason = catArguments(args.begin(), args.end());
-    return (theReason);
-}
-
-void Server::handleSimpleCommand(Connection& client, 
-                                const std::string& cmd, 
-                                const std::vector<std::string>& args,
-                                int index)
-{
-    if (cmd == "NICK")
-        CommandHandler::executeNick(args.at(0), client, nickToConnection, channels);
-    else if (cmd == "USER")
-        CommandHandler::executeUsername(args, client);
-    else if (cmd == "PASS")
-        CommandHandler::executePass(password, args.at(0), client);
-    else if (!client.isRegistered()) //block here to prevent non registered clients from executing commands below
-    {
-        client.sendMessage(Replies::CommonErrReplies(client.getNickname(), "", ERR_NOTREGISTERED));
-        return;
-    }
-    else if (cmd == "JOIN")
-        CommandHandler::executeJoin(args, client, channels);
-    else if (cmd == "PING")
-        CommandHandler::executePing(args.at(0), client);
-    else if (cmd == "PRIVMSG")
-        CommandHandler::executePrivMsg(args, client, nickToConnection, channels);
-    else if (cmd == "KICK")
-        std::cout << "todo\n";
-    else if (cmd == "INVITE")
-        std::cout << "todo\n";
-    else if (cmd == "TOPIC")
-        std::cout << "todo\n";
-    else if (cmd == "MODE")
-        std::cout << "todo\n";
-    else if (cmd == "QUIT")
-    {
-        notifyQuit(getReason(args), client);
-        client.sendMessage("ERROR :You quit\r\n");
-        removeConnection(client, index);
-    }
-}
-
-void Server::handleClientCommand(Connection& client, const std::string& msg, int index)
+void Server::handleClientCommand(Connection& client, pollfd& clientPoll, const std::string& msg)
 {
     std::stringstream           ss(msg);
     std::string                 line;
@@ -272,43 +229,148 @@ void Server::handleClientCommand(Connection& client, const std::string& msg, int
             arg.clear();
         } while (!s.eof());
 
-        handleSimpleCommand(client, command, args, index);
+        handleSimpleCommand(client, clientPoll, command, args);
         args.clear();
     }
     std::cout << "Message from the client\n" << msg << "\n";
 }
 
-void Server::notifyQuit(const std::string& reason, Connection& client) const
+void Server::handleSimpleCommand(Connection& client,
+                                pollfd& clientPoll, 
+                                const std::string& cmd, 
+                                const std::vector<std::string>& args)
+{
+    if (cmd == "NICK")
+        CommandHandler::executeNick(args.at(0), client, nickToConnection, channels);
+    else if (cmd == "USER")
+        CommandHandler::executeUsername(args, client);
+    else if (cmd == "PASS")
+        CommandHandler::executePass(password, args.at(0), client);
+    else if (!client.isRegistered()) //block here to prevent non registered clients from executing commands below
+    {
+        client.sendMessage(Replies::CommonErrReplies(client.getNickname(), "", ERR_NOTREGISTERED));
+        return;
+    }
+    else if (cmd == "JOIN")
+        CommandHandler::executeJoin(args, client, channels);
+    else if (cmd == "PING")
+        CommandHandler::executePing(args.at(0), client);
+    else if (cmd == "PRIVMSG")
+        CommandHandler::executePrivMsg(args, client, nickToConnection, channels);
+    else if (cmd == "KICK")
+        CommandHandler::executeKick(args, client, channels, nickToConnection);
+    else if (cmd == "INVITE")
+        CommandHandler::executeInvite(args, client, channels, nickToConnection);
+    else if (cmd == "TOPIC")
+        std::cout << "todo\n";
+    else if (cmd == "MODE")
+        std::cout << "todo\n";
+    else if (cmd == "QUIT")
+    {
+        notifyQuit(getReason(args), client);
+        client.sendMessage("ERROR :You quit\r\n");
+        removeConnection(client, clientPoll);
+    }
+}
+
+void Server::registerConnection(Connection& newConnection, 
+                                const pollfd& connectionPoll)
+{
+    connections.push_back(newConnection);
+    polls.push_back(connectionPoll);
+    fdToConnection.insert(std::pair<int, Connection&>(connectionPoll.fd, connections.back()));
+}
+
+void Server::createConnection()
+{
+    try
+    {
+        Connection      newConnection(listener.acceptConnection());
+        struct pollfd   newPollFd;
+
+        newPollFd.fd = newConnection.getFd();
+        newPollFd.events = POLLIN;
+        newPollFd.revents = 0;
+        
+        registerConnection(newConnection, newPollFd);
+    }
+    catch(const std::exception& e)
+    {
+        std::cerr << e.what() << '\n';
+    }
+}
+
+void Server::removeConnection(Connection& client, pollfd& clientPoll)
+{
+    removeClientFromChannels(client.getNickname());
+    deregisterConnection(client, clientPoll);
+}
+
+void Server::removeClientFromChannels(const std::string& nickname)
+{
+    std::map<std::string, Channel>::iterator it;
+    std::map<std::string, Channel>::iterator next;
+    std::map<std::string, Channel>::iterator end;
+
+    it = channels.begin();
+    end = channels.end();
+    next = it;
+    for (; it != end; it = next)
+    {
+        ++next;
+        if (it->second.isUserInChannel(nickname))
+        {
+            it->second.removeMember(nickname);
+            if (it->second.isEmpty()) //delete channel if it's empty
+                channels.erase(it);
+        }
+    }
+}
+
+void Server::deregisterConnection(Connection& client, pollfd& clientPoll)
+{
+    std::list<Connection>::iterator it;
+    std::list<Connection>::iterator end;
+    const std::string               clientNickname = client.getNickname();
+
+    nickToConnection.erase(client.getNickname());
+    fdToConnection.erase(clientPoll.fd);
+    it = connections.begin();
+    end = connections.end();
+    client.closeConnection();
+    for (; it != end; ++it)
+    {
+        if (it->getNickname() == clientNickname)
+        {
+            connections.erase(it);
+            break;
+        }
+    }
+    for (std::vector<pollfd>::iterator pit = polls.begin(); pit != polls.end(); ++pit)
+    {
+        if (pit->fd == clientPoll.fd)
+        {
+            polls.erase(pit);
+            break;
+        }
+    }
+}
+
+std::string getReason(const std::vector<std::string>& args)
+{
+    std::string theReason("");
+
+    if (args.size() < 2)
+        return (theReason);
+    theReason = catArguments(args.begin(), args.end());
+    return (theReason);
+}
+
+void Server::notifyQuit(const std::string& reason, const Connection& client) const
 {
     const std::string& mask = client.getMask();
 
     std::string message = ":" + mask + " QUIT :Quit: " + reason + "\r\n";
 
     CommandHandler::notifyUsersInClientChannels(message, channels, client);
-}
-
-void Server::handleClientInteraction(Connection& client, int index)
-{
-    int     res;
-    struct  pollfd& pollcl = polls.at(index);
-
-    if (pollcl.events & POLLHUP)
-        std::cout << "client closed connection\n";
-    else if (pollcl.events & POLLIN)
-    {    
-        res = client.handleClientMsg();
-        if (res == BUFFER_FULL)
-            std::cout << "Todo : message bigger than 512 bytes\n"; //https://modern.ircdocs.horse/#errinputtoolong-417
-        else if (res == READ_ERROR)
-            std::cout << "Reading error : " << strerror(errno) << '\n';
-        else if (res == CONNECTION_CLOSED)
-        {
-            notifyQuit(client.getNickname() + " closed connection\n", client);
-            removeConnection(client, index);
-        }
-        else if (res == ENDLINE_RECEIVED)
-            handleClientCommand(client, client.buffer, index);
-    }
-    else
-        std::cout << "What? Event received -> " << pollcl.events << '\n';
 }

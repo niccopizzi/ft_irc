@@ -138,9 +138,6 @@ void Connection::makeUserOp()
 
 void Connection::closeConnection()
 {
-    user.setNickname("");
-    user.setUsername("");
-    user.setAuthenticate(false);
     if (fd != -1)
         close(fd);
     fd = -1;
