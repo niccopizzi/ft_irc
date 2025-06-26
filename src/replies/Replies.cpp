@@ -1,8 +1,7 @@
 #include "Replies.hpp"
 
-const std::string Replies::CommonErrReplies(const std::string& nickname, 
-                                            const std::string& command,
-                                            int err)
+const std::string Replies::CommonErr(const std::string& nickname, 
+                                    const std::string& command, int err)
 {
     std::string reply = ":localhost ";
     if (err == ERR_NOTREGISTERED)
@@ -21,9 +20,8 @@ const std::string Replies::CommonErrReplies(const std::string& nickname,
     return (reply);
 }
 
-const std::string Replies::NickErrReplies(const std::string& nickname, 
-                                    const std::string& username,
-                                    int err)
+const std::string Replies::NickErr(const std::string& nickname, 
+                                    const std::string& oldnick, int err)
 {
     std::string reply = ":localhost ";
 
@@ -33,25 +31,24 @@ const std::string Replies::NickErrReplies(const std::string& nickname,
     }
     else if (err == ERR_ERRONEUSNICKNAME)
     {
-        reply += "432 ";
-        if (!username.empty())
-            reply += username + " ";    
+        reply += "432 " + (oldnick.empty() ? "*" : oldnick) + " ";
         reply += nickname + " :Erroneous Nickname\r\n";
     }
     else if (err == ERR_NICKNAMEINUSE)
     {
-        reply += "433 " + nickname + " :Nickname is already in use\r\n";
+        reply += "433 " + (oldnick.empty() ? "*" : oldnick) + " ";
+        reply += nickname + " :Nickname is already in use\r\n";
     }
     return (reply);
 }
 
-const std::string Replies::UserErrReplies(const std::string& nickname, int err)
+const std::string Replies::UserErr(const std::string& nickname, int err)
 {
     std::string reply = ":localhost ";
 
     if (err == ERR_NEEDMOREPARAMS)
     {
-        return (Replies::CommonErrReplies(nickname, "USER", ERR_NEEDMOREPARAMS));
+        return (Replies::CommonErr(nickname, "USER", ERR_NEEDMOREPARAMS));
     }
     else if (err == ERR_ALREADYREGISTERED)
     {
@@ -60,12 +57,12 @@ const std::string Replies::UserErrReplies(const std::string& nickname, int err)
     return (reply);
 }
 
-const std::string Replies::PassErrReplies(int err)
+const std::string Replies::PassErr(int err)
 {
     std::string reply = ":localhost ";
 
     if (err == ERR_NEEDMOREPARAMS)
-        return Replies::CommonErrReplies("", "PASS", ERR_NEEDMOREPARAMS);
+        return Replies::CommonErr("", "PASS", ERR_NEEDMOREPARAMS);
     else if (err == ERR_ALREADYREGISTERED)
         reply += "462 :You may not reregister\r\n";
     else if (err == ERR_PASSWDMISMATCH)
@@ -84,7 +81,7 @@ const std::string Replies::WelcomeMsg(const std::string& nickname,
     return (reply);
 }
 
-const std::string Replies::PrivMsgErrReplies(const std::string& sender, 
+const std::string Replies::PrivMsgErr(const std::string& sender, 
                                     const std::string& recipient,
                                     int err)
 {
@@ -106,7 +103,7 @@ const std::string Replies::PrivMsgErrReplies(const std::string& sender,
     return (reply);
 }
 
-const std::string Replies::JoinWelcomeReplies(const std::string& topic,
+const std::string Replies::JoinWelcome(const std::string& topic,
                                     const std::string& nickname,
                                     const std::string& channelname,
                                     int status)
@@ -120,7 +117,7 @@ const std::string Replies::JoinWelcomeReplies(const std::string& topic,
     return (reply);
 }
 
-const std::string   Replies::JoinErrReplies(const std::string& nickname,
+const std::string   Replies::JoinErr(const std::string& nickname,
                                     const std::string& chanName,
                                     const std::string& key,
                                     int err)
@@ -150,10 +147,10 @@ const std::string   Replies::JoinErrReplies(const std::string& nickname,
     return (reply);
 }
 
-const std::string Replies::KickErrReplies(const std::string& name,
-                                            const std::string& toKick,
-                                            const std::string& chanName,
-                                            int err)
+const std::string Replies::KickErr(const std::string& name,
+                                  const std::string& toKick,
+                                  const std::string& chanName,
+                                  int err)
 {
     std::string reply = ":localhost ";
 
@@ -176,10 +173,10 @@ const std::string Replies::KickErrReplies(const std::string& name,
     return (reply);
 }
 
-const std::string Replies::InviteErrReplies(const std::string& nickname,
-                                            const std::string& invited, 
-                                            const std::string& channel,   
-                                            int err)
+const std::string Replies::InviteErr(const std::string& nickname,
+                                    const std::string& invited, 
+                                    const std::string& channel,   
+                                    int err)
 {
     std::string reply = ":localhost ";
 

@@ -26,3 +26,10 @@ f a client’s JOIN command to the server is successful, the server MUST send, i
     The channel’s topic (with RPL_TOPIC (332) and optionally RPL_TOPICWHOTIME (333)), and no message if the channel does not have a topic.
     A list of users currently joined to the channel (with one or more RPL_NAMREPLY (353) numerics followed by a single RPL_ENDOFNAMES (366) numeric). 
     These RPL_NAMREPLY messages sent by the server MUST include the requesting client that has just joined the channel.
+
+TODO
+
+        FIX TOPIC message      
+        TEST
+        SWITCH TO EPOLL(?)
+        HANDLE SERVER CLOSING GRACEFULLY

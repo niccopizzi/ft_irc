@@ -10,14 +10,13 @@ void    startServer(char* port, char* password)
     {
         theServer.openPort();
     }
-
     catch(const std::exception& e)
     {
-        std::cerr << "Fatal error occurred : " << e.what() << " exiting\n";
+        std::cerr << "Could not start the server because : " << e.what() << "\nExiting...\n";
         return;
     }
     registerSignalHandlers();
-    std::cout << "SERVER STARTED!!!\nWE ARE RUNNING FAST AND FURIOUS ON PORT  : " << port << std::endl; 
+    std::cout << "\t\tSERVER STARTED!!!\n\tWE ARE RUNNING FAST AND FURIOUS ON PORT  : " << port << std::endl; 
     while (serverShouldRun)
     {
         try

@@ -1,20 +1,19 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <sstream>
+#include <algorithm>
 #include <iostream>
+#include <set>
 
 int main(void)
 {
-    std::map<std::string, std::string&> test;
-    
+    std::string iter = "abba\r";
 
-    std::string a("");
-    std::string b("ciao");
-    test.insert(std::pair<std::string, std::string&>("totest", b));
+    for (std::string::iterator it = iter.begin(); it != iter.end(); ++it)
+    {
+        if (*it == '\r' && *(it + 1) == '\n')
+            return (true);
+    }
 
-    test.erase("nonesiste");
-    if (b.empty())
-        std::cout << "gets removed\n";
-    return (0);
-    
 }

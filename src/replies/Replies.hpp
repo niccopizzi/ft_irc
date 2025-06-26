@@ -32,34 +32,34 @@
 class Replies
 {
 public:
-    static const std::string NickErrReplies(const std::string& nickname, 
-                                    const std::string& username,
+    static const std::string NickErr(const std::string& nickname, 
+                                    const std::string& oldnick,
                                     int err);
-    static const std::string JoinWelcomeReplies(const std::string& topic,
+    static const std::string JoinWelcome(const std::string& topic,
                                     const std::string& nickname,
                                     const std::string& channelname, int status);
-    static const std::string JoinErrReplies(const std::string& nickname,
+    static const std::string JoinErr(const std::string& nickname,
                                     const std::string& chanName,
                                     const std::string& key,
                                     int err); 
-    static const std::string UserErrReplies(const std::string& nickname, int err);
-    static const std::string PrivMsgErrReplies(const std::string& sender, 
+    static const std::string UserErr(const std::string& nickname, int err);
+    static const std::string PrivMsgErr(const std::string& sender, 
                                                 const std::string& recipient,
                                                 int err);
-    static const std::string PassErrReplies(int err);
+    static const std::string PassErr(int err);
     static const std::string WelcomeMsg(const std::string& nickname,
                                         const std::string& mask);
-    static const std::string KickErrReplies(const std::string& name,
-                                            const std::string& toKick,
-                                            const std::string& chanName,
-                                            int err);
-    static const std::string CommonErrReplies(const std::string& nickname, 
-                                                const std::string& command,
-                                                int err);
-    static const std::string InviteErrReplies(const std::string& nickname,
-                                            const std::string& invited,
-                                            const std::string& channel,
-                                            int err);
+    static const std::string KickErr(const std::string& name,
+                                    const std::string& toKick,
+                                    const std::string& chanName,
+                                    int err);
+    static const std::string CommonErr(const std::string& nickname, 
+                                        const std::string& command,
+                                        int err);
+    static const std::string InviteErr(const std::string& nickname,
+                                        const std::string& invited,
+                                        const std::string& channel,
+                                        int err);
 
 };
 

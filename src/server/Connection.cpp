@@ -2,7 +2,8 @@
 
 Connection::Connection() :  user(),
                             bytesInBuffer(0), 
-                            fd(-1)
+                            fd(-1),
+                            id(0)
 {
     connectionPoll = NULL;
     std::memset(&peeraddr, 0, sizeof(peeraddr));
@@ -10,9 +11,23 @@ Connection::Connection() :  user(),
         std::cout << "Connection default constructor called\n";
     #endif
 }
-Connection::Connection(int connectionFd, sockaddr_storage* addr) :  user(),
+
+Connection::Connection(int connectionFd, sockaddr_storage* addr) : user(),
                                                                     bytesInBuffer(0),
-                                                                    fd(connectionFd) 
+                                                                    fd(connectionFd),
+                                                                    id(0)
+{
+    connectionPoll = NULL;
+    std::memcpy(&peeraddr, addr, sizeof(peeraddr));
+    #ifdef DEBUG
+        std::cout << "Connection constructor called\n";
+    #endif
+}
+
+Connection::Connection(int connectionFd, connectionID conId, sockaddr_storage* addr) :  user(),
+                                                                                        bytesInBuffer(0),
+                                                                                        fd(connectionFd),
+                                                                                        id(conId) 
 {
     connectionPoll = NULL;
     std::memcpy(&peeraddr, addr, sizeof(peeraddr));
@@ -25,7 +40,8 @@ Connection::Connection(const Connection& connection) :  user(connection.user),
                                                         bytesInBuffer(connection.bytesInBuffer),
                                                         connectionPoll(connection.connectionPoll),
                                                         msgQueue(connection.msgQueue),
-                                                        fd(connection.fd) 
+                                                        fd(connection.fd), 
+                                                        id(connection.id)
 {
     std::memcpy(buffer, connection.buffer, connection.bytesInBuffer);
     std::memcpy(&peeraddr, &connection.peeraddr, sizeof(peeraddr));
@@ -41,6 +57,7 @@ Connection& Connection::operator=(const Connection& other)
         if (fd != -1)
             close(fd);
         fd = other.fd;
+        id = other.id;
         user = other.user;
         bytesInBuffer = other.bytesInBuffer;
         msgQueue = other.msgQueue;
@@ -74,6 +91,11 @@ pollfd* Connection::getPollFd() const
 const User& Connection::getUser() const
 {
     return (user);
+}
+
+connectionID  Connection::getConnectionId() const
+{
+    return (id);
 }
 
 const std::string& Connection::getUsername() const
@@ -158,12 +180,19 @@ void Connection::setAuth(bool auth)
     user.setAuthenticate(auth);
 }
 
+void Connection::setId(connectionID newId)
+{
+    if(id == 0)
+        id = newId;
+}
+
 void Connection::closeConnection()
 {
     if (fd != -1)
         close(fd);
     fd = -1;
     bytesInBuffer = 0;
+    id = 0;
     std::memset(buffer, 0, sizeof(buffer));
     std::memset(&peeraddr, 0, sizeof(peeraddr));
 }

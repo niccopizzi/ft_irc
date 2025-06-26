@@ -1,5 +1,20 @@
 #include "CommandHandler.hpp"
 
+void split(std::string toSplit, char delimiter, std::vector<std::string>& storage)
+{
+    std::string val;
+    std::size_t pos;
+
+    do
+    {
+        pos = toSplit.find(delimiter);
+        val = toSplit.substr(0, pos);
+        if (!val.empty())
+            storage.push_back(toSplit.substr(0, pos));
+        toSplit.erase(0, pos + 1);
+    } while (pos != toSplit.npos);
+}
+
 bool    isNotValidFirstChar(char c)
 {
     return ((c >= '0' && c <= '9' ) || c == '#' || c == ':' || c == '&'
@@ -31,192 +46,102 @@ bool    isNickValid(const std::string& nick)
 }
 
 bool    isNickUsed(const std::string& nickName,
-                const std::map<const std::string&, Connection&>& nickToConnection)
+                const std::map<const std::string, Connection&>& nickToConnection)
 {
     return (nickToConnection.find(nickName) != nickToConnection.end());
 }
 
 
 void CommandHandler::notifyUsersInClientChannels(const std::string& message,
-                                            const std::map<std::string, Channel>& channels,
+                                            const std::map<const std::string, Channel>& channels,
                                             const Connection& client)
 {
-    const std::string& nick = client.getNickname();
+    const connectionID clientId = client.getConnectionId();
     std::map<std::string, Channel>::const_iterator it = channels.begin();
     std::map<std::string, Channel>::const_iterator end = channels.end();
 
     for (; it != end; ++it)
     {
-        if (it->second.isUserInChannel(nick))
+        if (it->second.isUserInChannel(clientId))
         {
-            it->second.broadCastMessage(message, client);
+            it->second.sendChanMessage(message, client);
         }
     }
 }
 
-void CommandHandler::executeNick(const std::string& nickname, 
-                                Connection& client,
-                                std::map<const std::string&, Connection&>& nickToConnection,
-                                std::map<std::string, Channel>& channels)
+bool    validateNickArgs(const std::vector<std::string>* args, Connection& client,
+                        std::map<const std::string, Connection&>& nickToConnection)
 {
     if (!client.isAuthenticated())
-        client.enqueueMsg(":You need to authenticate first\n");
-    if (nickname.empty())
-        client.enqueueMsg(Replies::NickErrReplies("", "", ERR_NONICKNAMEGIVEN));
-    else if (!isNickValid(nickname))
-        client.enqueueMsg(Replies::NickErrReplies(nickname, client.getUsername(), ERR_ERRONEUSNICKNAME));
-    else if (nickname == client.getNickname())
-        return;    
-    else if (isNickUsed(nickname, nickToConnection))
-        client.enqueueMsg(Replies::NickErrReplies(nickname, client.getUsername(), ERR_NICKNAMEINUSE));
-    else
     {
+        client.enqueueMsg(":localhost :You need to authenticate first!\r\n");
+        return (false);
+    }
+    if (args == NULL)
+    {
+        client.enqueueMsg(Replies::NickErr("", "", ERR_NONICKNAMEGIVEN));
+        return (false);
+    }
+    const std::string& nickname = args->at(0);
+    if (!isNickValid(nickname))
+    {
+        client.enqueueMsg(Replies::NickErr(nickname, client.getUsername(), ERR_ERRONEUSNICKNAME));
+        return (false);
+    }
+    if (nickname == client.getNickname())
+        return (false);
+    if (isNickUsed(nickname, nickToConnection))
+    {
+        client.enqueueMsg(Replies::NickErr(nickname, client.getUsername(), ERR_NICKNAMEINUSE));
+        return (false);
+    }
+    return (true);
+}
+
+void CommandHandler::executeNick(const std::vector<std::string>* args, 
+                            Connection& client,
+                            std::map<const std::string, Connection&>& nickToConnection,
+                            std::map<const std::string, Channel>& channels)
+{
+    if (!validateNickArgs(args, client, nickToConnection))
+        return;
+    
+    const std::string& nickname = args->at(0);
+    if (client.isRegistered())
+    {
+        nickToConnection.erase(client.getNickname());
+        const std::string message(":" + client.getMask() + " NICK :" + nickname + "\r\n");
+        client.enqueueMsg(message);
+        notifyUsersInClientChannels(message, channels, client);
+        client.setNickname(nickname);
+    }
+    else 
+    {
+        client.setNickname(nickname);
         if (client.isRegistered())
         {
-            client.enqueueMsg(":" + client.getMask() +  " NICK :" + nickname + "\r\n");
-            notifyUsersInClientChannels(":" + client.getMask() +  " NICK :" + nickname + "\r\n", channels, client);
-            client.setNickname(nickname);
-        }
-        else 
-        {
-            client.setNickname(nickname);
-            if (client.isRegistered())
-            {
-                client.enqueueMsg(Replies::WelcomeMsg(nickname, client.getMask()));
-            }
-            nickToConnection.insert(std::pair<const std::string&, Connection&>(client.getNickname(), client));
+            client.enqueueMsg(Replies::WelcomeMsg(nickname, client.getMask()));
         }
     }
+    nickToConnection.insert(std::pair<const std::string, Connection&>(nickname, client));
 }
 
-void CommandHandler::executePass(const std::string& toMatch,
-                                const std::string& toCheck, 
-                                Connection& client)
-{
-    if (client.isAuthenticated())
-    {
-        client.enqueueMsg(Replies::PassErrReplies(ERR_ALREADYREGISTERED));
-    }
-    else if (toCheck.empty())
-    {
-        client.enqueueMsg(Replies::PassErrReplies(ERR_NEEDMOREPARAMS));
-    }
-    else if (toCheck != toMatch)
-    {
-        client.enqueueMsg(Replies::PassErrReplies(ERR_PASSWDMISMATCH));
-    }
-    else
-        client.setAuth(true);
-}
-    
-void CommandHandler::executePing(const std::string& token,
-                            Connection& client)
-{
-    if (!token.empty())
-        client.enqueueMsg("PONG :" + token + "\r\n");
-    else
-        client.enqueueMsg("PONG" "\r\n");
-}
-
-std::string    catArguments(std::vector<std::string>::const_iterator begin,
-                            std::vector<std::string>::const_iterator end)
-{
-    std::string ret("");
-
-    if ((end - 1)->empty())
-        end = end - 1;
-    while (begin != end)
-    {
-        ret += *begin;
-        ++begin;
-        if ((begin) != end)
-            ret += " ";
-    }
-    if (ret.at(0) == ':')
-        ret.erase(0, 1);
-    return (ret);
-}
-
-void sendPrivateMessage(Connection& sender, 
-                        Connection& recipient, 
-                        const std::vector<std::string>& args)
-{
-    std::string incipit = ":" + sender.getMask() + " PRIVMSG " + recipient.getNickname() + " :";
-    std::string message = catArguments(args.begin() + 1, args.end());
-
-    message.append("\r\n");
-    recipient.enqueueMsg(incipit + message);
-}
-
-void sendChannelMessage(Connection& sender,
-                        Channel& channel,
-                        const std::vector<std::string>& args)
-{
-    std::string incipit = ":" + sender.getMask() + " PRIVMSG " + channel.getName() + " :";
-    std::string message = catArguments(args.begin() + 1, args.end());
-
-    message.append("\r\n");
-    channel.broadCastMessage(incipit + message, sender);
-}
-
-void CommandHandler::executePrivMsg(const std::vector<std::string>& args, 
-                                Connection& client,
-                                std::map<const std::string&, Connection&>& nickToConnection,
-                                std::map<std::string, Channel>& channels)
-{
-    std::map<const std::string&, Connection&>::iterator targetClient;
-    std::map<std::string, Channel>::iterator targetChannel;
-    std::string  target;
-
-    if (args.empty() || args.at(0).empty())
-    {
-        client.enqueueMsg(Replies::PrivMsgErrReplies(client.getNickname(), "", ERR_NORECIPIENT));
-        return;
-    }
-    target = args.at(0);
-    if (args.size() == 1)
-    {
-        client.enqueueMsg(Replies::PrivMsgErrReplies(client.getNickname(), target, ERR_NOTEXTTOSEND));
-        return;
-    }
-    if (*target.begin() == '#' || *target.begin() == '&')
-    {   
-        targetChannel = channels.find(target);
-        if (targetChannel == channels.end())
-            client.enqueueMsg(Replies::PrivMsgErrReplies(client.getNickname(), target, ERR_NOSUCHNICK));
-        else if (!targetChannel->second.isUserInChannel(client.getNickname()) && 
-                    (targetChannel->second.getMode() & FLG_EXTERNAL_MSG) == 0)
-            client.enqueueMsg(Replies::PrivMsgErrReplies(client.getNickname(), target, ERR_CANNOTSENDTOCHAN));
-        else
-            sendChannelMessage(client, targetChannel->second, args);
-    }
-    else
-    {
-        targetClient = nickToConnection.find(target);
-        if (targetClient == nickToConnection.end() || !targetClient->second.isRegistered())
-            client.enqueueMsg(Replies::PrivMsgErrReplies(client.getNickname(), target, ERR_NOSUCHNICK));
-        else
-            sendPrivateMessage(client, targetClient->second, args);
-    }
-}
-
-void CommandHandler::executeUsername(const std::vector<std::string>& args,
-                                Connection& client)
+void CommandHandler::executeUsername(const std::vector<std::string>* args, Connection& client)
 {
     if (!client.isAuthenticated())
-        client.enqueueMsg("You need to authenticate first!\n");
-    else if (args.size() < 4)
+        client.enqueueMsg(":localhost :You need to authenticate first!\r\n");
+    else if (args == NULL || args->size() < 4)
     {
-        client.enqueueMsg(Replies::UserErrReplies(client.getNickname(), ERR_NEEDMOREPARAMS)); 
+        client.enqueueMsg(Replies::UserErr(client.getNickname(), ERR_NEEDMOREPARAMS)); 
     }
     else if (client.isRegistered())
     {
-        client.enqueueMsg(Replies::UserErrReplies(client.getNickname(), ERR_ALREADYREGISTERED));
+        client.enqueueMsg(Replies::UserErr(client.getNickname(), ERR_ALREADYREGISTERED));
     }
     else
     {
-        client.setUsername(args.at(0));
-        client.setFullname(catArguments(args.begin() + 3, args.end()));
+        client.setUsername(args->at(0));
+        client.setFullname(catArguments(args->begin() + 3, args->end()));
         if (client.isRegistered())
         {
             client.enqueueMsg(Replies::WelcomeMsg(client.getNickname(), client.getMask()));
@@ -224,19 +149,25 @@ void CommandHandler::executeUsername(const std::vector<std::string>& args,
     }
 }
 
-std::vector<std::string>    splitValues(std::string toSplit)
+
+void CommandHandler::executePass(const std::vector<std::string>* args,
+                            Connection& client,
+                            const std::string& toMatch)
 {
-    std::vector<std::string> splitted;
-    std::size_t pos;
-
-    do
+    if (client.isAuthenticated())
     {
-        pos = toSplit.find(',');
-        splitted.push_back(toSplit.substr(0, pos));
-        toSplit.erase(0, pos + 1);
-    } while (pos != toSplit.npos);
-
-    return (splitted);
+        client.enqueueMsg(Replies::PassErr(ERR_ALREADYREGISTERED));
+    }
+    else if (args == NULL)
+    {
+        client.enqueueMsg(Replies::PassErr(ERR_NEEDMOREPARAMS));
+    }
+    else if (args->at(0) != toMatch)
+    {
+        client.enqueueMsg(Replies::PassErr(ERR_PASSWDMISMATCH));
+    }
+    else
+        client.setAuth(true);
 }
 
 bool    isChanNameValid(const std::string& chanName)
@@ -257,21 +188,21 @@ bool    isChanNameValid(const std::string& chanName)
 void    createChannel(const std::string& chanName, 
                         const std::string& key, 
                         Connection& creator,
-                        std::map<std::string, Channel>& channels)
+                        std::map<const std::string, Channel>& channels)
 {
     std::pair<std::string, Channel> newChannel;
 
     if (key.empty())
-        newChannel = std::pair<std::string, Channel>(chanName, Channel(chanName, creator));
+        newChannel = std::pair<const std::string, Channel>(chanName, Channel(chanName, creator));
     else
-        newChannel = std::pair<std::string, Channel>(chanName, Channel(chanName, key, creator));
+        newChannel = std::pair<const std::string, Channel>(chanName, Channel(chanName, key, creator));
     channels.insert(newChannel);
     newChannel.second.sendWelcomeMessage(creator);
 }
 
 void    handleJoinArgs(const std::vector<std::string>& channelNames,
                         const std::vector<std::string>& channelKeys,
-                        std::map<std::string, Channel>& channels,
+                        std::map<const std::string, Channel>& channels,
                         Connection& client)
 {
     std::string chanName;
@@ -283,7 +214,7 @@ void    handleJoinArgs(const std::vector<std::string>& channelNames,
         chanName = channelNames.at(i);
         if (!isChanNameValid(chanName))
         {
-            client.enqueueMsg(Replies::JoinErrReplies(client.getNickname(), chanName, "", ERR_BADCHANMASK));
+            client.enqueueMsg(Replies::JoinErr(client.getNickname(), chanName, "", ERR_BADCHANMASK));
             return;
         }
         chanKey = "";
@@ -302,32 +233,119 @@ void    handleJoinArgs(const std::vector<std::string>& channelNames,
     }
 }
 
-void    CommandHandler::executeJoin(
-                                    const std::vector<std::string>& args,
+void    CommandHandler::executeJoin(const std::vector<std::string>* args,
                                     Connection& client,
-                                    std::map<std::string, Channel>& channels)
+                                    std::map<const std::string, Channel>& channels)
 {
     std::vector<std::string> channelNames;
     std::vector<std::string> channelKeys;
 
-    if (args.empty() || args.at(0).empty())
+    if (args == NULL)
     {
-        client.enqueueMsg(Replies::CommonErrReplies(client.getNickname(), "JOIN", ERR_NEEDMOREPARAMS));
+        client.enqueueMsg(Replies::CommonErr(client.getNickname(), "JOIN", ERR_NEEDMOREPARAMS));
+        return;
     }
-    channelNames = splitValues(args.at(0));
-    if (args.size() > 1)
-        channelKeys = splitValues(args.at(1));
+    split(args->at(0), ',', channelNames);
+    if (args->size() > 1)
+        split(args->at(1), ',', channelKeys);
     handleJoinArgs(channelNames, channelKeys, channels, client);
 }
 
+void CommandHandler::executePing(const std::vector<std::string>* args, Connection& client)
+{
+    if (args == NULL)
+        client.enqueueMsg("PONG\r\n");
+    else
+        client.enqueueMsg("PONG :" + args->at(0) + "\r\n");
+}
+
+std::string    catArguments(std::vector<std::string>::const_iterator begin,
+                            std::vector<std::string>::const_iterator end)
+{
+    std::string ret("");
+
+    while (begin != end)
+    {
+        ret += *begin;
+        ++begin;
+        if ((begin) != end)
+            ret += " ";
+    }
+    if (ret.at(0) == ':')
+        ret.erase(0, 1);
+    return (ret);
+}
+
+void sendPrivateMessage(Connection& sender, 
+                        Connection& recipient, 
+                        const std::vector<std::string>* args)
+{
+    std::string incipit(":" + sender.getMask() + " PRIVMSG " + recipient.getNickname() + " :");
+    std::string message(catArguments(args->begin() + 1, args->end()));
+
+    message.append("\r\n");
+    recipient.enqueueMsg(incipit + message);
+}
+
+void sendChannelMessage(Connection& sender,
+                        Channel& channel,
+                        const std::vector<std::string>* args)
+{
+    std::string incipit(":" + sender.getMask() + " PRIVMSG " + channel.getName() + " :");
+    std::string message(catArguments(args->begin() + 1, args->end()));
+
+    message.append("\r\n");
+    channel.sendChanMessage(incipit + message, sender);
+}
+
+void CommandHandler::executePrivMsg(const std::vector<std::string>* args, 
+                                    Connection& client,
+                                    std::map<const std::string, Channel>& channels,
+                                    std::map<const std::string, Connection&>& nickToConnection)
+{
+    std::map<const std::string, Connection&>::iterator  targetClient;
+    std::map<std::string, Channel>::iterator            targetChannel;
+    std::string  target;
+
+    if (args == NULL)
+    {
+        client.enqueueMsg(Replies::PrivMsgErr(client.getNickname(), "", ERR_NORECIPIENT));
+        return;
+    }
+    if (args->size() == 1)
+    {
+        client.enqueueMsg(Replies::PrivMsgErr(client.getNickname(), target, ERR_NOTEXTTOSEND));
+        return;
+    }
+    target = args->at(0);
+    if (target.at(0) == '#' || target.at(0) == '&')
+    {   
+        targetChannel = channels.find(target);
+        if (targetChannel == channels.end())
+            client.enqueueMsg(Replies::PrivMsgErr(client.getNickname(), target, ERR_NOSUCHNICK));
+        else if (!targetChannel->second.isUserInChannel(client.getConnectionId()) && 
+                    (targetChannel->second.getMode() & FLG_EXTERNAL_MSG) == 0)
+            client.enqueueMsg(Replies::PrivMsgErr(client.getNickname(), target, ERR_CANNOTSENDTOCHAN));
+        else
+            sendChannelMessage(client, targetChannel->second, args);
+    }
+    else
+    {
+        targetClient = nickToConnection.find(target);
+        if (targetClient == nickToConnection.end() || !targetClient->second.isRegistered())
+            client.enqueueMsg(Replies::PrivMsgErr(client.getNickname(), target, ERR_NOSUCHNICK));
+        else
+            sendPrivateMessage(client, targetClient->second, args);
+    }
+}
 
 void    removeUsers(std::vector<std::string>& usersToKick,
                     const std::string& reason,
                     Channel& channel, 
                     Connection& kicker,
-                    std::map<const std::string&, Connection&> nickToConnection)
+                    std::map<const std::string, Connection&> nickToConnection)
 {
-    std::map<const std::string&, Connection&>::iterator toKick;
+    std::map<const std::string, Connection&>::iterator toKick;
     std::string theReason;
     std::string message = ":" + kicker.getMask() + " KICK " + channel.getName() + " ";
 
@@ -336,60 +354,61 @@ void    removeUsers(std::vector<std::string>& usersToKick,
         toKick = nickToConnection.find(*it);
         if (toKick == nickToConnection.end())
         {
-            kicker.enqueueMsg(Replies::KickErrReplies(kicker.getNickname(), *it, channel.getName(), ERR_NOSUCHNICK));
+            kicker.enqueueMsg(Replies::KickErr(kicker.getNickname(), *it, channel.getName(), ERR_NOSUCHNICK));
             return;
         }
-        else if (!channel.isUserInChannel(toKick->first))
+        else if (!channel.isUserInChannel(toKick->second.getConnectionId()))
         {
-            kicker.enqueueMsg(Replies::KickErrReplies(kicker.getNickname(), *it, channel.getName(), ERR_USERNOTINCHANNEL));
+            kicker.enqueueMsg(Replies::KickErr(kicker.getNickname(), *it, channel.getName(), ERR_USERNOTINCHANNEL));
             return;
         }
         else
         {
             theReason = reason.empty() ? *it : reason;
-            channel.broadCastMessage(message + *it + " :" + (theReason) + "\r\n", kicker);
-            kicker.enqueueMsg(message + *it + " :" + theReason + "\r\n");
-            channel.removeMember(toKick->first);
+            channel.broadCastMessage(message + *it + " :" + (theReason) + "\r\n"); //check if it works the same
+            /* channel.broadCastMessage(message + *it + " :" + (theReason) + "\r\n", kicker);
+            kicker.enqueueMsg(message + *it + " :" + theReason + "\r\n"); */
+            channel.removeMember(toKick->second.getConnectionId());
         }
     }
 }
 
-void CommandHandler::executeKick(const std::vector<std::string>& args,
-                            Connection& kicker,
-                            std::map<std::string, Channel>& channels,
-                            std::map<const std::string&, Connection&> nickToConnection)
+void CommandHandler::executeKick(const std::vector<std::string>* args,
+                                Connection& kicker,
+                                std::map<const std::string, Channel>& channels,
+                                std::map<const std::string, Connection&>& nickToConnection)
 {
-    std::map<std::string, Channel>::iterator it;
-    std::vector<std::string>  usersToKick;
+    std::map<std::string, Channel>::iterator    it;
+    std::vector<std::string>                    usersToKick;
 
     usersToKick.reserve(5);
-    if (args.size() < 2 || args.at(1).empty())
-        kicker.enqueueMsg(Replies::CommonErrReplies(kicker.getNickname(), "KICK", ERR_NEEDMOREPARAMS));
-    else if ((it = channels.find(args.at(0))) == channels.end())
-        kicker.enqueueMsg(Replies::KickErrReplies(kicker.getNickname(), "", args.at(0), ERR_NOSUCHCHANNEL));
-    else if (!it->second.isUserInChannel(kicker.getNickname()))
-        kicker.enqueueMsg(Replies::KickErrReplies(kicker.getNickname(), "", it->first, ERR_NOTONCHANNEL));
-    else if (!it->second.isUserOperator(kicker.getNickname()))
-        kicker.enqueueMsg(Replies::KickErrReplies(kicker.getNickname(), "", it->first, ERR_CHANOPRIVSNEEDED));
+    if (args == NULL || args->size() < 2)
+        kicker.enqueueMsg(Replies::CommonErr(kicker.getNickname(), "KICK", ERR_NEEDMOREPARAMS));
+    else if ((it = channels.find(args->at(0))) == channels.end())
+        kicker.enqueueMsg(Replies::KickErr(kicker.getNickname(), "", args->at(0), ERR_NOSUCHCHANNEL));
+    else if (!it->second.isUserInChannel(kicker.getConnectionId()))
+        kicker.enqueueMsg(Replies::KickErr(kicker.getNickname(), "", it->first, ERR_NOTONCHANNEL));
+    else if (!it->second.isUserOperator(kicker.getConnectionId()))
+        kicker.enqueueMsg(Replies::KickErr(kicker.getNickname(), "", it->first, ERR_CHANOPRIVSNEEDED));
     else
     {
-        usersToKick = splitValues(args.at(1));
-        if (args.size() >= 3 && !args.at(2).empty())
+        split(args->at(1), ',', usersToKick);
+        if (args->size() >= 3)
         {
-            std::string reason = catArguments(args.begin() + 2, args.end());
+            std::string reason = catArguments(args->begin() + 2, args->end());
             removeUsers(usersToKick, reason, it->second, kicker, nickToConnection);
         }
         else
             removeUsers(usersToKick, "", it->second, kicker, nickToConnection);
         if (it->second.isEmpty())
-            channels.erase(it->first); //remove channel if the last users kicked himself out
+            channels.erase(it->first); //remove channel if the last users kicked herself out
     }
 }
 
 void    handleInvitation(Connection& inviter,
                         Channel& channel, Connection& userInvited)
 {
-    const std::string message = ":" + inviter.getMask() + " INVITE " + userInvited.getNickname() + " " + channel.getName() + "\r\n";
+    const std::string message(":" + inviter.getMask() + " INVITE " + userInvited.getNickname() + " " + channel.getName() + "\r\n");
 
     channel.storeUserInvitation(&userInvited);
     inviter.enqueueMsg(message);
@@ -397,113 +416,206 @@ void    handleInvitation(Connection& inviter,
 
 }
 
-void CommandHandler::executeInvite(const std::vector<std::string>& args,
+void CommandHandler::executeInvite(const std::vector<std::string>* args,
                             Connection& inviter,
-                            std::map<std::string, Channel>& channels,
-                            std::map<const std::string&, Connection&>& nickToConnection)
+                            std::map<const std::string, Channel>& channels,
+                            std::map<const std::string, Connection&>& nickToConnection)
 {
-    std::map<std::string, Channel>::iterator            targetChan;
-    std::map<const std::string&, Connection&>::iterator targetClient;
-    std::string clientName;
+    std::map<const std::string, Channel>::iterator          targetChan;
+    std::map<const std::string, Connection&>::iterator      targetClient;
 
-    clientName = args.at(0);
-    if (args.size() < 2 || args.at(1).empty())
+    if (args == NULL || args->size() < 2)
     {
-        inviter.enqueueMsg(Replies::CommonErrReplies(inviter.getNickname(), "INVITE", ERR_NEEDMOREPARAMS));
+        inviter.enqueueMsg(Replies::CommonErr(inviter.getNickname(), "INVITE", ERR_NEEDMOREPARAMS));
         return;
     }
-    targetClient = nickToConnection.find(clientName);
+
+    const std::string& invitedClient = args->at(0);  
+    targetClient = nickToConnection.find(invitedClient);
     if (targetClient == nickToConnection.end())
     {
-        inviter.enqueueMsg(Replies::InviteErrReplies(inviter.getNickname(), clientName, "", ERR_NOSUCHNICK));
+        inviter.enqueueMsg(Replies::InviteErr(inviter.getNickname(), invitedClient, "", ERR_NOSUCHNICK));
         return;
     }
-    targetChan = channels.find(args.at(1));
+    targetChan = channels.find(args->at(1));
     if (targetChan == channels.end())
     {
-        inviter.enqueueMsg(Replies::InviteErrReplies(inviter.getNickname(), "", args.at(1), ERR_NOSUCHCHANNEL));
+        inviter.enqueueMsg(Replies::InviteErr(inviter.getNickname(), "", args->at(1), ERR_NOSUCHCHANNEL));
         return;
     }
-    if (!targetChan->second.isUserInChannel(inviter.getNickname()))
+    if (!targetChan->second.isUserInChannel(inviter.getConnectionId()))
     {
-        inviter.enqueueMsg(Replies::InviteErrReplies(inviter.getNickname(), "", args.at(1), ERR_NOTONCHANNEL));
+        inviter.enqueueMsg(Replies::InviteErr(inviter.getNickname(), "", args->at(1), ERR_NOTONCHANNEL));
         return;
     }
-    if (targetChan->second.isUserInChannel(targetClient->first))
+    if (targetChan->second.isUserInChannel(targetClient->second.getConnectionId()))
     {
-        inviter.enqueueMsg(Replies::InviteErrReplies(inviter.getNickname(), targetClient->first, targetChan->first, ERR_USERONCHANNEL));
+        inviter.enqueueMsg(Replies::InviteErr(inviter.getNickname(), targetClient->first, targetChan->first, ERR_USERONCHANNEL));
         return;
     }
-    if ((targetChan->second.getMode() & FLG_INVITE_ONLY) && !targetChan->second.isUserOperator(inviter.getNickname()))
+    if ((targetChan->second.getMode() & FLG_INVITE_ONLY) && 
+        !targetChan->second.isUserOperator(inviter.getConnectionId()))
     {
-        inviter.enqueueMsg(Replies::InviteErrReplies(inviter.getNickname(), targetClient->first, targetChan->first, ERR_CHANOPRIVSNEEDED));
+        inviter.enqueueMsg(Replies::InviteErr(inviter.getNickname(), targetClient->first, targetChan->first, ERR_CHANOPRIVSNEEDED));
         return;
     }
     handleInvitation(inviter, targetChan->second, targetClient->second);
 }
 
-void setTopic (Connection& changer, Channel& channel, const std::string& newTopic)
-{
-    const std::string message = ":" + changer.getNickname() + " TOPIC " + newTopic + "\r\n";
-    
-    channel.setTopic(newTopic);
-    channel.broadCastMessage(message, changer);
-    changer.enqueueMsg(message);
-}
 
-void sendTopic(Connection& asker, Channel& channel)
+void CommandHandler::executeTopic(const std::vector<std::string>* args,
+                                    Connection& asker,
+                                    std::map<const std::string, Channel>& channels)
 {
-    if (channel.getTopic().empty())
-        asker.enqueueMsg(":" + asker.getNickname() + " " + channel.getName() + " :No topic is set\r\n");
-    else
-        asker.enqueueMsg(":" + asker.getNickname() + channel.getName() + " :" + channel.getTopic() + "\r\n");
-}
+    std::map<const std::string, Channel>::iterator    targetChan;
 
-void CommandHandler::executeTopic(const std::vector<std::string>& args,
-                                Connection& asker, std::map<std::string, Channel>& channels)
-{
-    std::map<std::string, Channel>::iterator    targetChan;
-    std::string                                 chanName;
-
-    chanName = args.at(0);
-    if (chanName.empty())
+    if (args == NULL)
     {
-        asker.enqueueMsg(Replies::CommonErrReplies(asker.getNickname(), "TOPIC", ERR_NEEDMOREPARAMS));
+        asker.enqueueMsg(Replies::CommonErr(asker.getNickname(), "TOPIC", ERR_NEEDMOREPARAMS));
         return;
     }
+    const std::string& chanName = args->at(0);
     targetChan = channels.find(chanName);
     if (targetChan == channels.end())
     {
-        asker.enqueueMsg(Replies::KickErrReplies(asker.getNickname(), "", chanName, ERR_NOSUCHCHANNEL));
+        asker.enqueueMsg(Replies::KickErr(asker.getNickname(), "", chanName, ERR_NOSUCHCHANNEL));
         return;
     }
-    if (!targetChan->second.isUserInChannel(asker.getNickname()))
+    if (!targetChan->second.isUserInChannel(asker.getConnectionId()))
     {
-        asker.enqueueMsg(Replies::InviteErrReplies(asker.getNickname(), "", targetChan->first, ERR_NOTONCHANNEL));
+        asker.enqueueMsg(Replies::InviteErr(asker.getNickname(), "", targetChan->first, ERR_NOTONCHANNEL));
         return;
     }
-    if (args.size() >= 2 && !args.at(1).empty())
+    if (args->size() >= 2)
     {
         if (targetChan->second.getMode() & FLG_TOPIC_RESTRICT 
-            && !targetChan->second.isUserOperator(asker.getNickname()))
+            && !targetChan->second.isUserOperator(asker.getConnectionId()))
         {
             asker.enqueueMsg(":localhost 482 " + asker.getNickname() + 
                             " " + targetChan->first + " :You are not a channel operator\r\n");
             return;
         }
-        std::string newTopic = catArguments(args.begin() + 1, args.end());
-        setTopic(asker, targetChan->second, newTopic);
+        std::string newTopic = catArguments(args->begin() + 1, args->end());
+        targetChan->second.setTopic(newTopic, asker);
     }
     else
-        sendTopic(asker, targetChan->second);
+        targetChan->second.sendTopic(asker);
 }
 
-void CommandHandler::executeMode(const std::vector<std::string>& args,
-                            Connection& changer,
-                            std::map<std::string, Channel>& channels)
+bool handleOpChange(bool set, Connection& client, Channel& chan, const std::string& toChange,
+                    const std::map<const std::string, Connection&> nickToConn)
 {
-    if (args.at(0).empty()) 
+    std::map<const std::string, Connection&>::const_iterator it;
+
+    it = nickToConn.find(toChange);
+    if (it == nickToConn.end())
+    {
+        client.enqueueMsg(Replies::KickErr(client.getNickname(), toChange, "", ERR_NOSUCHNICK));
+        return (false);
+    }
+    if (!chan.isUserInChannel(it->second.getConnectionId()))
+    {
+        client.enqueueMsg(Replies::InviteErr(client.getNickname(), toChange,
+                 chan.getName(), ERR_USERNOTINCHANNEL));
+        return(false);
+    }
+    if (set)
+    {
+        chan.addOperator(it->second);
+        chan.broadCastMessage(":" + client.getMask() + " MODE " + chan.getName() + " :+o " + toChange + "\r\n");
+    }
+    else
+    {
+        chan.removeOperator(it->second);
+        chan.broadCastMessage(":" + client.getMask() + " MODE " + chan.getName() + " :-o " + toChange + "\r\n");
+    }
+    return (true);
+}
+
+void handleModeArgs(const std::vector<std::string>* args, Connection& client, Channel& chan,
+            const std::map<const std::string, Connection&> nickToConn)
+{
+    char    curr;
+    bool    set;
+    const std::string& modeString = args->at(1);
+    std::vector<std::string>::const_iterator params = args->begin() + 2;
+    std::vector<std::string>::const_iterator argsEnd = args->end();
+    std::string::const_iterator it;
+    std::string::const_iterator end;
+    std::string param;
+
+    it = modeString.begin();
+    end = modeString.end();
+
+    for (; it != end; ++it)
+    {
+        curr = *it;
+        if (!std::strchr("+-klnito", curr))
+        {
+            std::string msg;
+            msg.push_back(curr);
+            msg += " :is an unknown mode char to me\r\n";
+            client.enqueueMsg(msg);
+            return;
+        }
+        if (curr == '+')
+        {
+            set = true;
+            continue;
+        }
+        if (curr == '-')
+        {
+            set = false;
+            continue;
+        }
+        if (((curr == 'k' || curr == 'l') && set) || curr == 'o')
+        {
+            if (params == argsEnd)
+            {
+                client.enqueueMsg(Replies::CommonErr(client.getNickname(), "MODE", ERR_NEEDMOREPARAMS));
+                return;
+            }
+            param = *params;
+            ++params;
+        }
+        if (curr == 'o' && !handleOpChange(set, client, chan, param, nickToConn))
+            return;
+        else
+            set ? chan.setChanMode(curr, client, param) : chan.unsetChanMode(curr, client);
+    }
+}
+
+void CommandHandler::executeMode(const std::vector<std::string>* args,
+                            Connection& modder,
+                            std::map<const std::string, Channel>& channels,
+                            const std::map<const std::string, Connection&>& nickToConn)
+{
+    std::map<const std::string, Channel>::iterator    targetChannel;
+
+    if (args == NULL)
+    {
+        modder.enqueueMsg(Replies::CommonErr(modder.getNickname(), "MODE", ERR_NEEDMOREPARAMS));
         return;
-    
-    std::cout << "tpdp\n";
+    }
+    const std::string& target = args->at(0);
+    if (target.at(0) != '#' && target.at(0) != '&') //handle only mode command for channels
+        return;
+    targetChannel = channels.find(target);
+    if (targetChannel == channels.end())
+    {
+        modder.enqueueMsg(Replies::KickErr(modder.getNickname(), "", target, ERR_NOSUCHCHANNEL));
+        return;
+    }
+    if (args->size() == 1)
+    {
+        targetChannel->second.sendModeMessage(modder);
+        return;
+    }
+    if (!targetChannel->second.isUserOperator(modder.getConnectionId())) //if here means the user is trying to change the keys
+    {
+        modder.enqueueMsg(Replies::KickErr(modder.getNickname(), "", targetChannel->first, ERR_CHANOPRIVSNEEDED));
+        return;
+    }
+    else
+        handleModeArgs(args, modder, targetChannel->second, nickToConn);
 }

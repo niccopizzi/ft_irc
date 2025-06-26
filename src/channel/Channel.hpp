@@ -4,6 +4,7 @@
 #include <vector>
 #include <map>
 #include <string>
+#include <set>
 #include "../server/Connection.hpp"
 #include "../replies/Replies.hpp"
 
@@ -16,14 +17,14 @@
 class Channel
 {
 private:
+    int                                                 mode;
+    int                                                 userLimit;
     std::string                                         name;
     std::string                                         topic;
     std::string                                         key;
-    int                                                 mode;
-    int                                                 userLimit;
-    std::map<const std::string&, Connection&>           members;
-    std::map<const std::string&, const Connection&>     operators;
-    std::vector<const Connection*>                      usersInvited; //keep track of invited uers
+    std::map<connectionID, Connection*>                 members;
+    std::set<connectionID>                              operators;
+    std::set<connectionID>                              usersInvited; //keep track of invited user, better to store the nick invited or the id of the connection?
     
     void    sendListofNames(Connection& client) const;
 
@@ -40,24 +41,31 @@ public:
     int                     getMode() const;
     int                     getUserLimit() const;
 
-    const std::map<const std::string&, Connection&>&     getMembers() const;
-    const std::map<const std::string&, const Connection&>&     getOperators() const;
+    const std::map<connectionID, Connection*>&        getMembers() const;
+    const std::set<connectionID>&                     getOperators() const;
 
+    void    setKey(const std::string& newKey);
     void    setMode(int flags);
-    void    setTopic(const std::string& topic);
+    void    setTopic(const std::string& topic, Connection& changer);
     void    setName(const std::string& name);
+    void    setUserLimit(int newLimit);
     void    storeUserInvitation(const Connection* invitee);
-    int     addMember(Connection& client,
-                    const std::string& providedKey);
-    void    removeMember(const std::string& nickname);
+    int     addMember(Connection& client, const std::string& providedKey);
+    void    removeMember(const connectionID clientId);
     void    addOperator(Connection& newOp);
-
-    std::vector<const Connection*>::iterator    getInvitePos(const Connection* user);
+    void    removeOperator(Connection& op);
+    
+    
     bool    isEmpty() const;
-    bool    isUserInChannel(const std::string& nickname) const;
-    bool    isUserOperator(const std::string& nickname) const;
-    void    broadCastMessage(const std::string& message, const Connection& sender) const;
+    bool    isUserInChannel(connectionID id) const;
+    bool    isUserOperator(connectionID id) const;
+    void    broadCastMessage(const std::string& message) const;
+    void    sendChanMessage(const std::string& message, const Connection& sender) const;
     void    sendWelcomeMessage(Connection& client) const;
+    void    sendModeMessage(Connection& asker) const;
+    void    sendTopic(Connection& asker) const;
+    void    unsetChanMode(char flag, Connection& unsetter);
+    void    setChanMode(char flag, Connection& setter, const std::string& arg);
 };
 
 #endif

@@ -12,6 +12,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <ctime>
+#include <queue>
 
 
 #define BUFFER_FULL         -3
@@ -21,7 +22,7 @@
 #define NO_END               1
 
 
-#include <queue>
+typedef long    connectionID;
 
 class Connection
 {
@@ -33,10 +34,12 @@ private:
     pollfd*                     connectionPoll;
     std::queue<std::string>     msgQueue;
     int                         fd;
+    connectionID                id; //unique id that identifies the connection
     
     public:
     Connection();
     Connection(int connectionFd, sockaddr_storage* addr);
+    Connection(int connectionFd, connectionID conId, sockaddr_storage* addr);
     Connection(const Connection& connection);
     Connection& operator=(const Connection& other);
     ~Connection();
@@ -46,12 +49,14 @@ private:
     std::queue<std::string>&    getQueue();
     pollfd*             getPollFd() const;
     int                 getFd() const;
+    connectionID        getConnectionId() const;
     const User&         getUser() const;
     const std::string&  getUsername() const;
     const std::string&  getNickname() const;
     const std::string&  getFullname() const;
     const std::string&  getMask()   const;
     void                setConnectionPoll(pollfd* pdf);
+    void                setId(connectionID newId);
     void                setFd(int fd);
     void                setUser(User& user);
     void                setNickname(const std::string& nick);
