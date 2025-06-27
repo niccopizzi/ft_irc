@@ -1,10 +1,9 @@
 #include "Bender.hpp"
 
-Bender::Bender() : name("bender"),
+Bender::Bender() : name("BobBender"),
                     port("8080"),
-                    levelOfHoliness(1),
+                    levelOfHoliness(BOB),
                     connectionFd(-1),
-                    state(PASS),
                     nickTries(0)
 {
     #ifdef DEBUG
@@ -12,16 +11,41 @@ Bender::Bender() : name("bender"),
     #endif
 }
 
-Bender::Bender(const std::string& nick, const std::string& pass,
-                const char* thePort, int level) : name(nick),
+
+Bender::Bender(const std::string& pass, const char* thePort) : name("Satanbender"),
+                                                                password(pass),
+                                                                port(thePort),
+                                                                levelOfHoliness(SATAN),
+                                                                connectionFd(-1),
+                                                                nickTries(0)
+{
+    #ifdef DEBUG
+        std::cout << "Bender constructor called\n";
+    #endif
+}
+
+Bender::Bender(const std::string& pass, const char* thePort, int level) :
                                                 password(pass),
                                                 port(thePort),
                                                 levelOfHoliness(level),
                                                 connectionFd(-1),
-                                                state(PASS),
                                                 nickTries(0)
 {
     std::memset(&connectionPoll, 0, sizeof(connectionPoll));
+    switch (levelOfHoliness)
+    {
+    case SATAN:
+        name = "SatanBender";
+        break;
+    case BOB:
+        name = "BobBender";
+        break;
+    case GANDHI:
+        name = "GandhiBender";
+        break;
+    default:
+        break;
+    }
     #ifdef DEBUG
         std::cout << "Bender constructor called\n";
     #endif
@@ -32,7 +56,6 @@ Bender::Bender(const Bender& bender) : name(bender.name),
                                     port(bender.port),
                                     levelOfHoliness(bender.levelOfHoliness),
                                     connectionFd(bender.connectionFd),
-                                    state(bender.state),
                                     nickTries(bender.nickTries)
 
 {
@@ -54,7 +77,6 @@ Bender& Bender::operator=(const Bender& other)
         password = other.password;
         levelOfHoliness = other.levelOfHoliness;
         connectionPoll = other.connectionPoll;
-        state = other.state;
         nickTries = other.nickTries;
         std::memcpy(&connectionPoll, &other.connectionPoll, sizeof(pollfd));
     }
@@ -125,14 +147,20 @@ void Bender::pollEvents()
         handleServerReply();
 }
 
-bool    endLineReceived(const std::string& message)
+bool    endLineReceived(std::string& message)
 {
-    for (std::string::const_iterator it = message.begin(); it != message.end(); ++it)
+    for (std::string::iterator it = message.begin(); it != message.end(); ++it)
     {
-        if (*it == '\n' ||
-            (*it == '\r' && *(it + 1) == '\n'))
+        if (*it == '\n')
         {
-            return(true);
+            message.erase(it);
+            return (true);
+        }
+        if (*it == '\r' && *(it + 1) == '\n')
+        {
+            message.erase(it + 1);
+            message.erase(it);
+            return (true);
         }
     }
     return (false);
@@ -143,13 +171,15 @@ void Bender::handleServerReply()
     std::vector<std::string> splittedReply;
     std::string              arg0;
     int                      ret;
+    char                     msgBuf[513];
 
-    if ((ret = recv(connectionFd, buffer, 512, 0)) < 0)
+    if ((ret = recv(connectionFd, msgBuf, 512, 0)) < 0)
         throw std::runtime_error("error in reading message from server");
     if (ret == 0)
         throw std::runtime_error("they got us! Server closed the connection!!");
-    std::cout << "message from the server\n" << buffer;
-    std::string msgFromServer(buffer);
+    msgBuf[ret] = 0;
+    std::cout << "message from the server\n" << msgBuf;
+    std::string msgFromServer(msgBuf);
     if (!endLineReceived(msgFromServer))
         return;
     splittedReply.reserve(5);
@@ -158,27 +188,106 @@ void Bender::handleServerReply()
     arg0 = splittedReply.at(1);
     if (splittedReply.at(0) == ":localhost")
     {
-        if (arg0 == "464")
+        handleLocalhostMsg(splittedReply.at(1));
+    }
+    else
+        handleUserAction(splittedReply);
+}
+
+void Bender::handleLocalhostMsg(const std::string& num)
+{
+    if (num == "464")
             throw std::runtime_error("You gave me the wrong password!");
-        if (arg0 == "432")
-            enqueueMsg("NICK bender\r\n");
-        else if (arg0 == "433")
-        {
-            if (nickTries == 1)
-                name += "OG";
-            else if (nickTries == 2)
-                name += "theReal";
-            else if (nickTries == 3)
-                name += "OneAndOnly";
-            else
-                throw std::runtime_error("Cannot find a nickname! Bye bye");
-            nickTries++;
-            enqueueMsg("NICK " + name + "\r\n");
-        }
-        else if (arg0 == "001")
-            std::cout << "WE ARE IN MOTHERFUCKER!!\n";
+    if (num == "432") //erroneous nickname
+        enqueueMsg("NICK bender\r\n");
+    else if (num == "433") //nickname already in use
+    {
+        if (nickTries == 0)
+            name += "OG"; 
+        else if (nickTries == 1)
+            name += "theReal";
+        else if (nickTries == 2)
+            name += "OneAndOnly";
+        else if (nickTries == 3)
+            name += "SnoopDogg";
+        else
+            throw std::runtime_error("Cannot find a nickname! Bye bye");
+        nickTries++;
+        enqueueMsg("NICK " + name + "\r\n");
+    }
+    else if (num == "001")
+        std::cout << "WE ARE IN MOTHERFUCKER!!\n";
+}
+
+void Bender::handleUserAction(const std::vector<std::string>& msg)
+{
+    const std::string& action = msg.at(1);
+
+    if (action == "PRIVMSG")
+    {
+        const std::string& target = msg.at(2);
+        if (target == name)
+            handlePrivateMsg(msg);
+        else
+            handleChannelMsg(msg);
+    }
+    else if (action == "INVITE")
+        enqueueMsg("JOIN " + msg.at(3) + "\r\n");
+    else if (action == "MODE")
+    {
+        handleModeChange(msg);
     }
 }
+
+void Bender::handlePrivateMsg(const std::vector<std::string>& msg)
+{
+    (void)msg;
+}
+
+void Bender::handleChannelMsg(const std::vector<std::string>& msg)
+{
+    (void)msg;
+}  
+
+void Bender::handleModeChange(const std::vector<std::string>& msg)
+{
+    struct modeArgs args;
+
+    args.channel = msg.at(2);
+    args.modeChanged = msg.at(3);
+    args.target = msg.at(4);
+    
+    if (args.modeChanged == ":+o")
+    {
+        if(args.target == name)
+            channels.insert(args.channel);
+    }
+    else if (args.modeChanged == ":-o")
+    {
+        if (args.target == name)
+            channels.erase(args.channel);
+    }
+    else
+    {
+        levelOfHoliness = SATAN;
+        switch (levelOfHoliness)
+        {
+        case SATAN:
+            enqueueMsg("PRIVMSG " + args.channel + " :STOP CHANGING MODES YOU STUP** MOT****[redacted]\r\n");
+            break;
+        case BOB:
+            enqueueMsg("PRIVMSG " + args.channel + " :Mhhh, ok!\r\n");
+            break;
+        case GANDHI:
+            enqueueMsg("PRIVMSG " + args.channel + " :In a gentle way, you can shake the world\r\n");
+            break;
+        default:
+            break;
+        }
+    }
+}
+
+
 
 void Bender::enqueueMsg(const std::string& message)
 {

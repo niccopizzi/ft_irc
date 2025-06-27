@@ -2,7 +2,7 @@
 
 int main(int argc, char* argv[])
 {
-    Bender  bender("bender", "pass", "8080", GANDHI);
+    Bender  bender("pass", "8080", GANDHI);
 
     (void)argc;
     (void)argv;

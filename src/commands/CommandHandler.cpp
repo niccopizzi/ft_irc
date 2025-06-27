@@ -506,6 +506,7 @@ bool handleOpChange(bool set, Connection& client, Channel& chan, const std::stri
                     const std::map<const std::string, Connection&> nickToConn)
 {
     std::map<const std::string, Connection&>::const_iterator it;
+    bool    isTargetOp;
 
     it = nickToConn.find(toChange);
     if (it == nickToConn.end())
@@ -519,12 +520,13 @@ bool handleOpChange(bool set, Connection& client, Channel& chan, const std::stri
                  chan.getName(), ERR_USERNOTINCHANNEL));
         return(false);
     }
-    if (set)
+    isTargetOp = chan.isUserOperator(it->second.getConnectionId());
+    if (set && !isTargetOp)
     {
         chan.addOperator(it->second);
         chan.broadCastMessage(":" + client.getMask() + " MODE " + chan.getName() + " :+o " + toChange + "\r\n");
     }
-    else
+    else if (isTargetOp)
     {
         chan.removeOperator(it->second);
         chan.broadCastMessage(":" + client.getMask() + " MODE " + chan.getName() + " :-o " + toChange + "\r\n");
