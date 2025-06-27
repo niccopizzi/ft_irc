@@ -621,3 +621,42 @@ void CommandHandler::executeMode(const std::vector<std::string>* args,
     else
         handleModeArgs(args, modder, targetChannel->second, nickToConn);
 }
+
+void CommandHandler::executeList(Connection& client, const std::map<const std::string, Channel>& channels)
+{
+    std::string     incipit(":localhost 322 " + client.getNickname() + " ");
+    std::string     msg;
+    std::stringstream    channelNum("");
+
+    for (std::map<const std::string, Channel>::const_iterator it = channels.begin();
+        it != channels.end(); ++it)
+    {
+        channelNum << (it->second.getMembers().size());
+        channelNum >> msg;
+        client.enqueueMsg(incipit + it->first + " " + msg + " :" + it->second.getTopic() + "\r\n");
+        msg.clear();
+        channelNum.clear();
+    }
+    client.enqueueMsg(":localhost 323 " + client.getNickname() + " :End of /LIST\r\n");
+}
+
+void CommandHandler::executeWho(const std::vector<std::string>* args, Connection& querier,
+                             const std::map<const std::string, Channel>& channels)
+{
+    std::map<const std::string, Channel>::const_iterator it;
+
+    if (args == NULL)
+        return;
+    const std::string& target = args->at(0);
+    if (target.at(0) != '#' && target.at(0) != '&')
+        return;
+    it = channels.find(target);
+    if (it == channels.end())
+    {
+        querier.enqueueMsg(":localhost 403 " + querier.getNickname() + " " + target + " :No such nick/channel\r\n");
+        return;
+    }
+    std::string incipit(":localhost 352 " + querier.getNickname() + " " + target + " ");
+    querier.enqueueMsg(incipit + it->second.getNamesList() +"\r\n");
+    querier.enqueueMsg(":localhost 315 " + querier.getNickname() + " " + target + " :End of /WHO list\r\n");
+}

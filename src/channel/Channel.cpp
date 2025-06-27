@@ -331,3 +331,22 @@ void Channel::setChanMode(char flag, Connection& setter, const std::string& arg)
     msg.append("\r\n");
     broadCastMessage(msg);
 }
+
+
+std::string Channel::getNamesList() const
+{
+    std::map<connectionID, Connection*>::const_iterator it;
+    std::map<connectionID, Connection*>::const_iterator end;
+    std::string list("");
+
+    it = members.begin();
+    end = members.end();
+    for (; it != end;)
+    {
+        list += it->second->getNickname();
+        ++it;
+        if (it != end)
+            list += " ";
+    }
+    return (list);
+}

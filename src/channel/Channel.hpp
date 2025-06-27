@@ -40,6 +40,7 @@ public:
     const std::string&      getKey() const;
     int                     getMode() const;
     int                     getUserLimit() const;
+    std::string             getNamesList() const;
 
     const std::map<connectionID, Connection*>&        getMembers() const;
     const std::set<connectionID>&                     getOperators() const;

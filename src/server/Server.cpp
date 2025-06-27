@@ -195,7 +195,7 @@ void Server::pollEvents()
     }
     
     //printQueue(connections);
-    printserver();
+    //printserver();
 }
 
 void Server::handleClientInteraction(pollfd& activePoll)
@@ -220,7 +220,7 @@ void Server::handleClientInteraction(pollfd& activePoll)
             std::cout << "Reading error : " << strerror(errno) << '\n';
         else if (res == CONNECTION_CLOSED)
         {
-            notifyQuit(client.getNickname() + " closed connection\n", client);
+            notifyQuit(client.getNickname() + " closed connection", client);
             removeConnection(client);
         }
         else if (res == ENDLINE_RECEIVED)
@@ -266,6 +266,8 @@ void Server::handleSimpleCommand(Connection& client,
                                 const std::vector<std::string>* args)
 {
 
+    if (cmd == "CAP")
+        return;
     if (cmd == "NICK")
         CommandHandler::executeNick(args, client, nickToConnection, channels);
     else if (cmd == "USER")
@@ -298,6 +300,10 @@ void Server::handleSimpleCommand(Connection& client,
         CommandHandler::executeTopic(args, client, channels);
     else if (cmd == "MODE")
         CommandHandler::executeMode(args, client, channels, nickToConnection);
+    else if (cmd == "LIST")
+        CommandHandler::executeList(client, channels);
+    else if (cmd == "WHO")
+        CommandHandler::executeWho(args, client, channels);
 }
 
 void Server::registerConnection(Connection& newConnection, 
@@ -413,7 +419,7 @@ void Server::notifyQuit(const std::string& reason, const Connection& client) con
 {
     const std::string& mask = client.getMask();
 
-    std::string message = ":" + mask + " QUIT :Quit: " + reason + "\r\n";
+    std::string message = ":" + mask + " QUIT :Quit : " + reason + "\r\n";
 
     CommandHandler::notifyUsersInClientChannels(message, channels, client);
 }

@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <sstream>
 #include "../channel/Channel.hpp"
 #include "../replies/Replies.hpp"
 
@@ -57,6 +58,11 @@ public:
                             Connection& modder,
                             std::map<const std::string, Channel>& channels,
                             const std::map<const std::string, Connection&>& nickToConn);
+
+    static void executeList(Connection& client, const std::map<const std::string, Channel>& channels);
+
+    static void executeWho(const std::vector<std::string>* args, Connection& querier,
+                             const std::map<const std::string, Channel>& channels);
 };
 
 
