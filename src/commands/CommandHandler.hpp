@@ -18,7 +18,7 @@ public:
 
     static void executeNick(const std::vector<std::string>* args, 
                             Connection& client,
-                            std::map<const std::string, Connection&>& nickToConnection,
+                            std::map<const std::string, Connection*>& nickToConnection,
                             std::map<const std::string, Channel>& channels);
 
     static void executeUsername(const std::vector<std::string>* args,
@@ -38,17 +38,17 @@ public:
     static void executePrivMsg(const std::vector<std::string>* args, 
                             Connection& client,
                             std::map<const std::string, Channel>& channels,
-                            std::map<const std::string, Connection&>& nickToConnection);
+                            std::map<const std::string, Connection*>& nickToConnection);
 
     static void executeKick(const std::vector<std::string>* args,
                             Connection& kicker,
                             std::map<const std::string, Channel>& channels,
-                            std::map<const std::string, Connection&>& nickToConnection);
+                            std::map<const std::string, Connection*>& nickToConnection);
     
     static void executeInvite(const std::vector<std::string>* args,
                             Connection& inviter,
                             std::map<const std::string, Channel>& channels,
-                            std::map<const std::string, Connection&>& nickToConnection);
+                            std::map<const std::string, Connection*>& nickToConnection);
 
     static void executeTopic(const std::vector<std::string>* args,
                             Connection& asker,
@@ -57,7 +57,7 @@ public:
     static void executeMode(const std::vector<std::string>* args,
                             Connection& modder,
                             std::map<const std::string, Channel>& channels,
-                            const std::map<const std::string, Connection&>& nickToConn);
+                            const std::map<const std::string, Connection*>& nickToConn);
 
     static void executeList(Connection& client, const std::map<const std::string, Channel>& channels);
 

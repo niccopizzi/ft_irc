@@ -23,8 +23,8 @@ private:
     std::vector<pollfd>                             polls;
     std::list<Connection>                           connections;
     std::map<const std::string, Channel>            channels;
-    std::map<int, Connection&>                      fdToConnection;
-    std::map<const std::string, Connection&>        nickToConnection;
+    std::map<int, Connection*>                      fdToConnection;
+    std::map<const std::string, Connection*>        nickToConnection;
     connectionID                                    currentId;
 
     void    createConnection();
@@ -54,8 +54,8 @@ public:
 
     const Listener&                                     getListener() const;
     const std::list<Connection>&                        getConnections() const;
-    const std::map<const std::string, Connection&>&     getNicksMap() const;
-    const std::map<int, Connection&>&                   getFdMap()    const;
+    const std::map<const std::string, Connection*>&     getNicksMap() const;
+    const std::map<int, Connection*>&                   getFdMap()    const;
     const std::vector<pollfd>&                          getPolls()    const;
 };
 

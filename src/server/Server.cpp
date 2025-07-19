@@ -85,12 +85,12 @@ const std::vector<pollfd>& Server::getPolls() const
     return (polls);
 }
 
-const std::map<const std::string, Connection&>& Server::getNicksMap() const
+const std::map<const std::string, Connection*>& Server::getNicksMap() const
 {
     return (nickToConnection);
 }
 
-const std::map<int, Connection&>&  Server::getFdMap() const
+const std::map<int, Connection*>&  Server::getFdMap() const
 {
     return (fdToConnection);
 }
@@ -201,7 +201,7 @@ void Server::pollEvents()
 void Server::handleClientInteraction(pollfd& activePoll)
 {
     int             res;
-    Connection& client = fdToConnection.find(activePoll.fd)->second;    
+    Connection& client = *fdToConnection.find(activePoll.fd)->second;    
 
     if (activePoll.events & POLLHUP)
         std::cout << "client closed connection\n";
@@ -319,13 +319,13 @@ void Server::registerConnection(Connection& newConnection,
     {
         for (std::vector<pollfd>::iterator it = polls.begin(); it != (polls.end() - 1); ++it)
         {
-            Connection& mappedConn = fdToConnection.find(it->fd)->second;
+            Connection& mappedConn = *fdToConnection.find(it->fd)->second;
             mappedConn.setConnectionPoll(&(*it));
         }
     }
     newConnection.setConnectionPoll(&polls.back());
     connections.push_back(newConnection);
-    fdToConnection.insert(std::pair<int, Connection&>(connectionPoll.fd, connections.back()));
+    fdToConnection.insert(std::pair<int, Connection*>(connectionPoll.fd, &connections.back()));
 }
 
 void Server::createConnection()

@@ -183,11 +183,11 @@ const std::string Replies::InviteErr(const std::string& nickname,
     if (err == ERR_NOSUCHNICK)
         reply += "401 " + nickname + " " + invited + " :No such nick/channel\r\n";
     else if (err == ERR_NOSUCHCHANNEL)
-        reply += "403" + nickname, + " " + channel + " :No such channel\r\n";
+        reply += "403 " + nickname, + " " + channel + " :No such channel\r\n";
     else if (err == ERR_NOTONCHANNEL)
         reply += "442 " + nickname + " " + channel + " :You are not on that channel\r\n";
     else if (err == ERR_USERONCHANNEL)
-        reply += "443" + nickname + " " + invited + " " + channel + " :is already on channel\r\n";
+        reply += "443 " + nickname + " " + invited + " " + channel + " :is already on channel\r\n";
     else if (err == ERR_CHANOPRIVSNEEDED)
         reply += "482 " + nickname + " " + channel + " :You're not channel operator\r\n";
     return (reply); 

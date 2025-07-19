@@ -1,7 +1,7 @@
 #ifndef SATANBENDER_HPP
 #define SATANBENDER_HPP
 
-#include "Bender.hpp"
+#include "../Bender.hpp"
 
 class SatanBender : public Bender
 {

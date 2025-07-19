@@ -1,5 +1,27 @@
 #include "Bender.hpp"
 
+std::string    epochToTimeStamp(time_t epochTime)
+{
+    std::tm*            t;
+    std::stringstream   stringStream;
+    const std::string months[12] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                                "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+    const std::string days[7] = {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"};
+
+    t = std::gmtime(&epochTime);
+    if (t->tm_wday < 1 || t->tm_wday > 7 || t->tm_mon < 1 || t->tm_mon > 12)
+    {
+        return (std::string("Error"));
+    }
+    stringStream << days[t->tm_wday - 1] << ", " << std::setfill('0') <<
+                std::setw(2) << t->tm_mday << " ";
+    stringStream << months[t->tm_mon - 1] <<  " " << t->tm_year + 1900 << " ";
+    stringStream << std::setfill('0') << std::setw(2) << t->tm_hour << ":"; 
+    stringStream << std::setfill('0') << std::setw(2) << t->tm_min << ":";
+    stringStream << std::setfill('0') << std::setw(2) << t->tm_sec << " " << t->tm_zone;
+    return (stringStream.str());
+}
+
 std::string    getTimeStamp(void)
 {
     std::time_t         currtime;
@@ -9,7 +31,7 @@ std::string    getTimeStamp(void)
                                 "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
     const std::string days[7] = {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"};
 
-    currtime = time(NULL);
+    currtime = std::time(NULL);
     t = std::gmtime(&currtime);
     if (t->tm_wday < 1 || t->tm_wday > 7 || t->tm_mon < 1 || t->tm_mon > 12)
     {

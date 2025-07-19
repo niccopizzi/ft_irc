@@ -21,12 +21,13 @@ OBJ = $(addprefix $(OBJ_DIR), $(SRC:.cpp=.o))
 
 NAME = ircserv
 
-BENDER_SRC = $(SRC_DIR)bender/Bender.cpp					\
-			$(SRC_DIR)bender/BenderFactory.cpp				\
-			$(SRC_DIR)bender/BobBender.cpp					\
-			$(SRC_DIR)bender/GandhiBender.cpp				\
-			$(SRC_DIR)bender/SatanBender.cpp				\
-			$(SRC_DIR)bender/bender_helper.cpp				\
+BENDER_SRC = $(SRC_DIR)bender/Bender.cpp						\
+			$(SRC_DIR)bender/bender_types/BenderFactory.cpp		\
+			$(SRC_DIR)bender/bender_types/BobBender.cpp			\
+			$(SRC_DIR)bender/bender_types/GandhiBender.cpp		\
+			$(SRC_DIR)bender/bender_types/SatanBender.cpp		\
+			$(SRC_DIR)bender/infochan/ChannelInfo.cpp			\
+			$(SRC_DIR)bender/bender_helper.cpp					\
 			$(SRC_DIR)bender/main.cpp
 
 BENDER_OBJ = $(addprefix $(OBJ_DIR), $(BENDER_SRC:.cpp=.o))

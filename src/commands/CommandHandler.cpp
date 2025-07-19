@@ -46,7 +46,7 @@ bool    isNickValid(const std::string& nick)
 }
 
 bool    isNickUsed(const std::string& nickName,
-                const std::map<const std::string, Connection&>& nickToConnection)
+                const std::map<const std::string, Connection*>& nickToConnection)
 {
     return (nickToConnection.find(nickName) != nickToConnection.end());
 }
@@ -70,7 +70,7 @@ void CommandHandler::notifyUsersInClientChannels(const std::string& message,
 }
 
 bool    validateNickArgs(const std::vector<std::string>* args, Connection& client,
-                        std::map<const std::string, Connection&>& nickToConnection)
+                        std::map<const std::string, Connection*>& nickToConnection)
 {
     if (!client.isAuthenticated())
     {
@@ -100,7 +100,7 @@ bool    validateNickArgs(const std::vector<std::string>* args, Connection& clien
 
 void CommandHandler::executeNick(const std::vector<std::string>* args, 
                             Connection& client,
-                            std::map<const std::string, Connection&>& nickToConnection,
+                            std::map<const std::string, Connection*>& nickToConnection,
                             std::map<const std::string, Channel>& channels)
 {
     if (!validateNickArgs(args, client, nickToConnection))
@@ -114,8 +114,10 @@ void CommandHandler::executeNick(const std::vector<std::string>* args,
         client.enqueueMsg(message);
         notifyUsersInClientChannels(message, channels, client);
         client.setNickname(nickname);
+        //nickToConnection[client.getNickname()] = (nickname, &client); //update the value of the nickname
+        //std::pair<const std::string, Connection*>(nickname, &client);
     }
-    else 
+     else 
     {
         client.setNickname(nickname);
         if (client.isRegistered())
@@ -123,7 +125,7 @@ void CommandHandler::executeNick(const std::vector<std::string>* args,
             client.enqueueMsg(Replies::WelcomeMsg(nickname, client.getMask()));
         }
     }
-    nickToConnection.insert(std::pair<const std::string, Connection&>(nickname, client));
+    nickToConnection.insert(std::pair<const std::string, Connection*>(nickname, &client));
 }
 
 void CommandHandler::executeUsername(const std::vector<std::string>* args, Connection& client)
@@ -301,9 +303,9 @@ void sendChannelMessage(Connection& sender,
 void CommandHandler::executePrivMsg(const std::vector<std::string>* args, 
                                     Connection& client,
                                     std::map<const std::string, Channel>& channels,
-                                    std::map<const std::string, Connection&>& nickToConnection)
+                                    std::map<const std::string, Connection*>& nickToConnection)
 {
-    std::map<const std::string, Connection&>::iterator  targetClient;
+    std::map<const std::string, Connection*>::iterator  targetClient;
     std::map<std::string, Channel>::iterator            targetChannel;
     std::string  target;
 
@@ -332,10 +334,10 @@ void CommandHandler::executePrivMsg(const std::vector<std::string>* args,
     else
     {
         targetClient = nickToConnection.find(target);
-        if (targetClient == nickToConnection.end() || !targetClient->second.isRegistered())
+        if (targetClient == nickToConnection.end() || !targetClient->second->isRegistered())
             client.enqueueMsg(Replies::PrivMsgErr(client.getNickname(), target, ERR_NOSUCHNICK));
         else
-            sendPrivateMessage(client, targetClient->second, args);
+            sendPrivateMessage(client, *targetClient->second, args);
     }
 }
 
@@ -343,9 +345,9 @@ void    removeUsers(std::vector<std::string>& usersToKick,
                     const std::string& reason,
                     Channel& channel, 
                     Connection& kicker,
-                    std::map<const std::string, Connection&> nickToConnection)
+                    std::map<const std::string, Connection*> nickToConnection)
 {
-    std::map<const std::string, Connection&>::iterator toKick;
+    std::map<const std::string, Connection*>::iterator toKick;
     std::string theReason;
     std::string message = ":" + kicker.getMask() + " KICK " + channel.getName() + " ";
 
@@ -357,7 +359,7 @@ void    removeUsers(std::vector<std::string>& usersToKick,
             kicker.enqueueMsg(Replies::KickErr(kicker.getNickname(), *it, channel.getName(), ERR_NOSUCHNICK));
             return;
         }
-        else if (!channel.isUserInChannel(toKick->second.getConnectionId()))
+        else if (!channel.isUserInChannel(toKick->second->getConnectionId()))
         {
             kicker.enqueueMsg(Replies::KickErr(kicker.getNickname(), *it, channel.getName(), ERR_USERNOTINCHANNEL));
             return;
@@ -368,7 +370,7 @@ void    removeUsers(std::vector<std::string>& usersToKick,
             channel.broadCastMessage(message + *it + " :" + (theReason) + "\r\n"); //check if it works the same
             /* channel.broadCastMessage(message + *it + " :" + (theReason) + "\r\n", kicker);
             kicker.enqueueMsg(message + *it + " :" + theReason + "\r\n"); */
-            channel.removeMember(toKick->second.getConnectionId());
+            channel.removeMember(toKick->second->getConnectionId());
         }
     }
 }
@@ -376,7 +378,7 @@ void    removeUsers(std::vector<std::string>& usersToKick,
 void CommandHandler::executeKick(const std::vector<std::string>* args,
                                 Connection& kicker,
                                 std::map<const std::string, Channel>& channels,
-                                std::map<const std::string, Connection&>& nickToConnection)
+                                std::map<const std::string, Connection*>& nickToConnection)
 {
     std::map<std::string, Channel>::iterator    it;
     std::vector<std::string>                    usersToKick;
@@ -419,10 +421,10 @@ void    handleInvitation(Connection& inviter,
 void CommandHandler::executeInvite(const std::vector<std::string>* args,
                             Connection& inviter,
                             std::map<const std::string, Channel>& channels,
-                            std::map<const std::string, Connection&>& nickToConnection)
+                            std::map<const std::string, Connection*>& nickToConnection)
 {
     std::map<const std::string, Channel>::iterator          targetChan;
-    std::map<const std::string, Connection&>::iterator      targetClient;
+    std::map<const std::string, Connection*>::iterator      targetClient;
 
     if (args == NULL || args->size() < 2)
     {
@@ -448,7 +450,7 @@ void CommandHandler::executeInvite(const std::vector<std::string>* args,
         inviter.enqueueMsg(Replies::InviteErr(inviter.getNickname(), "", args->at(1), ERR_NOTONCHANNEL));
         return;
     }
-    if (targetChan->second.isUserInChannel(targetClient->second.getConnectionId()))
+    if (targetChan->second.isUserInChannel(targetClient->second->getConnectionId()))
     {
         inviter.enqueueMsg(Replies::InviteErr(inviter.getNickname(), targetClient->first, targetChan->first, ERR_USERONCHANNEL));
         return;
@@ -459,7 +461,7 @@ void CommandHandler::executeInvite(const std::vector<std::string>* args,
         inviter.enqueueMsg(Replies::InviteErr(inviter.getNickname(), targetClient->first, targetChan->first, ERR_CHANOPRIVSNEEDED));
         return;
     }
-    handleInvitation(inviter, targetChan->second, targetClient->second);
+    handleInvitation(inviter, targetChan->second, *targetClient->second);
 }
 
 
@@ -503,9 +505,9 @@ void CommandHandler::executeTopic(const std::vector<std::string>* args,
 }
 
 bool handleOpChange(bool set, Connection& client, Channel& chan, const std::string& toChange,
-                    const std::map<const std::string, Connection&> nickToConn)
+                    const std::map<const std::string, Connection*> nickToConn)
 {
-    std::map<const std::string, Connection&>::const_iterator it;
+    std::map<const std::string, Connection*>::const_iterator it;
     bool    isTargetOp;
 
     it = nickToConn.find(toChange);
@@ -514,28 +516,28 @@ bool handleOpChange(bool set, Connection& client, Channel& chan, const std::stri
         client.enqueueMsg(Replies::KickErr(client.getNickname(), toChange, "", ERR_NOSUCHNICK));
         return (false);
     }
-    if (!chan.isUserInChannel(it->second.getConnectionId()))
+    if (!chan.isUserInChannel(it->second->getConnectionId()))
     {
         client.enqueueMsg(Replies::InviteErr(client.getNickname(), toChange,
                  chan.getName(), ERR_USERNOTINCHANNEL));
         return(false);
     }
-    isTargetOp = chan.isUserOperator(it->second.getConnectionId());
+    isTargetOp = chan.isUserOperator(it->second->getConnectionId());
     if (set && !isTargetOp)
     {
-        chan.addOperator(it->second);
+        chan.addOperator(*it->second);
         chan.broadCastMessage(":" + client.getMask() + " MODE " + chan.getName() + " :+o " + toChange + "\r\n");
     }
     else if (isTargetOp)
     {
-        chan.removeOperator(it->second);
+        chan.removeOperator(*it->second);
         chan.broadCastMessage(":" + client.getMask() + " MODE " + chan.getName() + " :-o " + toChange + "\r\n");
     }
     return (true);
 }
 
 void handleModeArgs(const std::vector<std::string>* args, Connection& client, Channel& chan,
-            const std::map<const std::string, Connection&> nickToConn)
+            const std::map<const std::string, Connection*> nickToConn)
 {
     char    curr;
     bool    set;
@@ -590,7 +592,7 @@ void handleModeArgs(const std::vector<std::string>* args, Connection& client, Ch
 void CommandHandler::executeMode(const std::vector<std::string>* args,
                             Connection& modder,
                             std::map<const std::string, Channel>& channels,
-                            const std::map<const std::string, Connection&>& nickToConn)
+                            const std::map<const std::string, Connection*>& nickToConn)
 {
     std::map<const std::string, Channel>::iterator    targetChannel;
 

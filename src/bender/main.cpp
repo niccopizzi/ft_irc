@@ -1,9 +1,8 @@
 #include "Bender.hpp"
-#include "BenderFactory.hpp"
+#include "./bender_types/BenderFactory.hpp"
 
 int main(int argc, char* argv[])
 {
-
     benderArgs storage;
 
     if (!validateArgs(argc, argv, &storage))

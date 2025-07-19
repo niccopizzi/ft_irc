@@ -21,18 +21,17 @@ void SatanBender::handleModeChange(const std::vector<std::string>& msg)
     args.modeChanged = msg.at(3);
     args.target = msg.at(4);
     
-    if (args.modeChanged == ":+o")
+    if (args.modeChanged == ":+o" && args.target == name)
     {
-        if(args.target == name)
-            channels.insert(args.channel);
+        channelsOperated.insert(args.channel);
     }
-    else if (args.modeChanged == ":-o")
+    else if (args.modeChanged == ":-o" && args.target == name)
     {
-        if (args.target == name)
-            channels.erase(args.channel);
+        channelsOperated.erase(args.channel);
     }
     else
-        enqueueMsg("PRIVMSG " + args.channel + " :STOP CHANGING MODES YOU STUP** MOT****[redacted]\r\n");
+        enqueueMsg("PRIVMSG " + args.channel + 
+                    " :STOP CHANGING MODES YOU STUP** MOT****[redacted]\r\n");
 }
 
 void SatanBender::handlePrivateMsg(const std::vector<std::string>& msg)

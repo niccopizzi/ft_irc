@@ -1,22 +1,23 @@
 #include "Bender.hpp"
 
-Bender::Bender(const std::string& pass, const std::string& theName, const char* thePort) : name(theName),
-                                                                password(pass),
-                                                                port(thePort),
-                                                                connectionFd(-1),
-                                                                nickTries(0)
+Bender::Bender(const std::string& pass, 
+                const std::string& theName, 
+                const char* thePort) :  name(theName),
+                                        password(pass),
+                                        port(thePort),
+                                        connectionFd(-1),
+                                        nickTries(0)
 {
     #ifdef DEBUG
         std::cout << "Bender constructor called\n";
     #endif
 }
 
-
-Bender::Bender(const Bender& bender) : name(bender.name),
-                                    password(bender.password),
-                                    port(bender.port),
-                                    connectionFd(bender.connectionFd),
-                                    nickTries(bender.nickTries)
+Bender::Bender(const Bender& bender) :  name(bender.name),
+                                        password(bender.password),
+                                        port(bender.port),
+                                        connectionFd(bender.connectionFd),
+                                        nickTries(bender.nickTries)
 
 {
     std::memcpy(&connectionPoll, &bender.connectionPoll, sizeof(pollfd));
@@ -44,16 +45,49 @@ Bender& Bender::operator=(const Bender& other)
     #endif
     return (*this);
 }
+
 Bender::~Bender()
 {
     if (connectionFd != -1)
     {
         close(connectionFd);
     }
+    for (std::map<std::string, ChannelInfo*>::iterator it = channelsJoined.begin();
+            it != channelsJoined.end(); ++it)
+    {
+        delete it->second;
+    }
     #ifdef DEBUG
         std::cout << "Bender destructor called\n";
     #endif
 }
+
+void Bender::printBender() const
+{
+    std::cout << "Channels on Server \n";
+    for (std::set<std::string>::const_iterator it = channelsOnServer.begin(); it != channelsOnServer.end(); ++it)
+    {
+        std::cout << "Channel name : " << *it <<"\n";
+    }
+    std::cout << "Channels operated\n";
+    for (std::set<std::string>::const_iterator it = channelsOperated.begin(); it != channelsOperated.end(); ++it)
+    {
+        std::cout << "Channel name : " << *it << "\n";
+    }
+    std::cout << "Channels info\n";
+    for (std::map<std::string, ChannelInfo*>::const_iterator it = channelsJoined.begin(); it != channelsJoined.end(); ++it)
+    {
+        std::cout << "Printing info for " << it->first << "\n";
+        for (std::map<std::string, UserStat>::const_iterator st = it->second->getStats().begin(); st != it->second->getStats().end();
+            ++st)
+        {
+            std::cout << st->first << " stats :\n";
+            std::cout << "\tInteractions : " << st->second.interactions << "\n";
+            std::cout << "\tLast seen    : " << st->second.lastSeen << "\n";
+        }
+    }
+}
+
 
 void Bender::connectToServer()
 {
@@ -90,7 +124,8 @@ void Bender::connectToServer()
     connectionPoll.fd = connectionFd;
     connectionPoll.events = POLLIN | POLLOUT;
     connectionPoll.revents = 0;
-    enqueueMsg("PASS " + password + "\r\nNICK " + name + "\r\nUSER bender 0 * :RealOg\r\n");
+    enqueueMsg("PASS " + password + "\r\nNICK " + name + 
+                "\r\nUSER bender 0 * :RealOg\r\n");
 }
 
 void Bender::pollEvents()
@@ -104,6 +139,7 @@ void Bender::pollEvents()
         dequeueMsg();
     else if (connectionPoll.revents & POLLIN)
         handleServerReply();
+    //printBender();
 }
 
 bool    endLineReceived(std::string& message)
@@ -138,36 +174,26 @@ void Bender::handleServerReply()
         throw std::runtime_error("they got us! Server closed the connection!!");
     msgBuf[ret] = 0;
     std::cout << "message from the server\n" << msgBuf;
-    std::string msgFromServer(msgBuf);
-    if (!endLineReceived(msgFromServer))
+    std::stringstream ss(msgBuf);
+    if (!ss.str().find('\n'))
         return;
     splittedReply.reserve(5);
-    split(msgFromServer, ' ', splittedReply);
-    std::memset(buffer, 0, ret);
-    arg0 = splittedReply.at(1);
-    if (splittedReply.at(0) == ":localhost")
+    std::string line;
+    while (std::getline(ss, line))
     {
-        handleServerMessage(splittedReply);
+        if(*(line.end() - 1) == '\r')
+            line.erase(line.end() - 1);
+        split(line, ' ', splittedReply);
+        arg0 = splittedReply.at(1);
+        if (splittedReply.at(0) == ":localhost")
+        {
+            handleServerMessage(splittedReply);
+        }
+        else
+            handleUserAction(splittedReply);
+        line.clear();
+        splittedReply.clear();
     }
-    else
-        handleUserAction(splittedReply);
-}
-
-void Bender::storeChannel(const std::vector<std::string>& args)
-{
-    channels.insert(args.at(2));
-}
-
-void Bender::storeChannelUsers(const std::vector<std::string>& args)
-{
-    std::set<std::string> users;
-
-    for (std::vector<std::string>::const_iterator it = args.begin() + 3; it != args.end(); ++it)
-    {
-        users.insert(*it);
-    }
-    channelToUsers.insert(std::pair<std::string, std::set<std::string> >(args.at(3), users));
-    
 }
 
 void Bender::handleServerMessage(const std::vector<std::string>& msg)
@@ -180,25 +206,57 @@ void Bender::handleServerMessage(const std::vector<std::string>& msg)
         enqueueMsg("NICK bender\r\n");
     else if (num == "433") //nickname already in use
     {
-        if (nickTries == 0)
-            name += "OG"; 
-        else if (nickTries == 1)
-            name += "theReal";
-        else if (nickTries == 2)
-            name += "OneAndOnly";
-        else if (nickTries == 3)
-            name += "SnoopDogg";
-        else
-            throw std::runtime_error("Cannot find a nickname! Bye bye");
-        nickTries++;
-        enqueueMsg("NICK " + name + "\r\n");
+        changeNick();
     }
-    else if (num == "001")
-        enqueueMsg("LIST\r\n");
-    else if (num == "322")
+    else if (num == "001") //welcome reply from server
+        enqueueMsg("LIST\r\n"); //ask list of channels 
+    else if (num == "322") //reply to LIST command
         storeChannel(msg);
-    else if (num == "352")
+    //else if (num == "353") //reply to JOIN command with list of users in the channel
+    else if (num == "352") //reply to WHO command
         storeChannelUsers(msg);
+}
+
+void Bender::storeChannel(const std::vector<std::string>& args)
+{
+    channelsOnServer.insert(args.at(3));
+}
+
+void Bender::storeChannelUsers(const std::vector<std::string>& args)
+{
+    std::set<std::string>   users;
+    ChannelInfo*            newChannelInfo;
+
+    for (std::vector<std::string>::const_iterator it = args.begin() + 4; 
+        it != args.end(); ++it)
+    {
+        users.insert(*it);
+    }
+    newChannelInfo = new ChannelInfo(users);
+    channelsJoined.insert(std::make_pair(args.at(3), newChannelInfo));
+}
+
+void Bender::changeNick()
+{
+    switch (nickTries)
+    {
+    case 0:
+        name += "OG";
+        break;
+    case 1:
+        name += "theReal";
+        break;
+    case 2:
+        name += "OneAndOnly";
+        break;
+    case 3:
+        name += "SnoopDogg";
+        break;
+    default:
+        throw std::runtime_error("Cannot find a nickname! Bye bye");
+    }
+    nickTries++;
+    enqueueMsg("NICK " + name + "\r\n");
 }
 
 void Bender::handleUserAction(const std::vector<std::string>& msg)
@@ -213,11 +271,49 @@ void Bender::handleUserAction(const std::vector<std::string>& msg)
         else
             handleChannelMsg(msg);
     }
-    else if (action == "INVITE")
+    else if (action == "INVITE" && msg.at(2) == name)
         enqueueMsg("JOIN " + msg.at(3) + "\r\n");
     else if (action == "MODE")
     {
         handleModeChange(msg);
+    }
+    else if (action == "JOIN")
+        handleJoin(msg);
+}
+
+void Bender::handleJoin(const std::vector<std::string>& msg)
+{
+    std::string         nickOfJoiner(msg.at(0));
+    std::string         channel(msg.at(2));
+    size_t              nicklen;
+
+    if (channel.at(0) == ':')
+        channel.erase(0, 1);
+    if (nickOfJoiner.at(0) == ':')
+        nickOfJoiner.erase(0, 1);
+    nicklen = nickOfJoiner.find('!');
+    if (nicklen != std::string::npos)
+        nickOfJoiner = nickOfJoiner.substr(0, nicklen);
+    if (nickOfJoiner == name) //reply Bender joininig a channel, ask who are the users
+    {
+        enqueueMsg("WHO " + channel + "\r\n");
+    }
+    else //a new person joined the channel, add the member
+    {
+        ChannelInfo* channelToUpdate = channelsJoined.find(channel)->second;
+        channelToUpdate->addMember(nickOfJoiner);
+    }
+}
+
+void Bender::handleNickChange(const std::vector<std::string>& msg)
+{
+    const std::string   nickOfChanger(msg.at(0).substr(msg.at(0).find('!')));
+    const std::string   newNick(msg.at(2).substr(1));
+
+    for(std::map<std::string, ChannelInfo*>::iterator it = channelsJoined.begin(); 
+            it != channelsJoined.end(); ++it)
+    {
+        it->second->updateMemberNick(nickOfChanger, newNick);
     }
 }
 
@@ -251,4 +347,9 @@ void Bender::dequeueMsg()
     {
         connectionPoll.events = POLLIN;
     }
+}
+
+void Bender::addChannelToOperatedSet(const std::string& chanName)
+{
+    channelsOperated.insert(chanName);
 }
