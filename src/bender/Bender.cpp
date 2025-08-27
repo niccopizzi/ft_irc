@@ -8,9 +8,6 @@ Bender::Bender(const std::string& pass,
                                         connectionFd(-1),
                                         nickTries(0)
 {
-    #ifdef DEBUG
-        std::cout << "Bender constructor called\n";
-    #endif
 }
 
 Bender::Bender(const Bender& bender) :  name(bender.name),
@@ -21,9 +18,6 @@ Bender::Bender(const Bender& bender) :  name(bender.name),
 
 {
     std::memcpy(&connectionPoll, &bender.connectionPoll, sizeof(pollfd));
-    #ifdef DEBUG
-        std::cout << "Bender copy constructor called\n";
-    #endif
 }
 
 Bender& Bender::operator=(const Bender& other)
@@ -40,9 +34,6 @@ Bender& Bender::operator=(const Bender& other)
         nickTries = other.nickTries;
         std::memcpy(&connectionPoll, &other.connectionPoll, sizeof(pollfd));
     }
-    #ifdef DEBUG
-        std::cout << "Bender copy operator called\n";
-    #endif
     return (*this);
 }
 
@@ -57,9 +48,6 @@ Bender::~Bender()
     {
         delete it->second;
     }
-    #ifdef DEBUG
-        std::cout << "Bender destructor called\n";
-    #endif
 }
 
 void Bender::printBender() const
@@ -298,7 +286,7 @@ void Bender::handleJoin(const std::vector<std::string>& msg)
     {
         enqueueMsg("WHO " + channel + "\r\n");
     }
-    else //a new person joined the channel, add the member
+    else //a new person joined the channel, store the member in the channel info
     {
         ChannelInfo* channelToUpdate = channelsJoined.find(channel)->second;
         channelToUpdate->addMember(nickOfJoiner);

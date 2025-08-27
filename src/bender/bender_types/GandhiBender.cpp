@@ -86,7 +86,7 @@ void GandhiBender::kickall(const std::string& chanName, const ChannelInfo* chanT
     it != chanToDestroy->getStats().end(); ++it)
     {
         if (it->first != name)
-        enqueueMsg(incipit + it->first + "\r\n");
+            enqueueMsg(incipit + it->first + "\r\n");
     }
     enqueueMsg("MODE " + chanName + " +k+l " + genRandKey() + " 1\r\n");
 }
@@ -109,7 +109,6 @@ void GandhiBender::handleChannelMsg(const std::vector<std::string>& msg)
             {
                 enqueueMsg("PRIVMSG " + channel + " :Secret mode unlocked: CHAOS ENSUES\r\n");
                 kickall(channel, it->second);
-                enqueueMsg("KICK " + channel + " " + it->second->getRandomUser() + "\r\n");
             }
         }
         else if (message.compare(0, 11, ":!datetime") == 0)

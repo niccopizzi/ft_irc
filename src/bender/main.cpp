@@ -4,10 +4,11 @@
 int main(int argc, char* argv[])
 {
     benderArgs storage;
-
+    
     if (!validateArgs(argc, argv, &storage))
-        return(1);
-        
+    return(1);
+    
+    std::srand(time(NULL));
     Bender* bender = BenderFactory::getBender(storage.pass, storage.port, storage.lvl);
     try
     {
