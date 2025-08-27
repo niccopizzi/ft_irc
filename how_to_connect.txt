@@ -1,0 +1,11 @@
+how to connect
+
+
+- Open hexchat
+- In the window it opens click on "add"
+- Name the network as you prefer (ex. ft_irc) then click on "edit"
+- In the new window click again on "edit" and change "newserver/6697" to "localhost/port" where port is the port you specify when launching ircserv then press enter
+- Deselect the option "Use SSL for all the servers on this network"
+- Click on Login method and change to "Server password"
+- Inside Password put the password you specify when launching ircserv
+- Click on close and in the window with all the servers choose the one you created and then click on "Connect"

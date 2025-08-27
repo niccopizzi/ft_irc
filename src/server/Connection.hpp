@@ -2,6 +2,7 @@
 #define CONNECTION_HPP
 
 #include "../user/User.hpp"
+#include "../Logger.hpp"
 #include <unistd.h>
 #include <fcntl.h>
 #include <cstdlib>
@@ -36,6 +37,10 @@ private:
     int                         fd;
     connectionID                id; //unique id that identifies the connection
     
+    #ifdef LOG
+        Logger* logger;
+    #endif
+
     public:
     Connection();
     Connection(int connectionFd, sockaddr_storage* addr);
@@ -72,6 +77,10 @@ private:
     bool                isAuthenticated(void) const;
     bool                isRegistered(void) const;
     int                 handleClientMsg();
+
+    #ifdef LOG
+        void setLogger(Logger* logger);
+    #endif
 };
 
 #endif

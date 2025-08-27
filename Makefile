@@ -1,11 +1,12 @@
 CXX = c++
-CXXFLAGS = -Wall -Wextra -std=c++98 $(INCLUDE)
+CXXFLAGS = -g -Wall -Wextra -std=c++98 $(INCLUDE)
 
 OBJ_DIR = obj/
 SRC_DIR = src/
 INCLUDE = -Iinclude
 
 SRC =		$(SRC_DIR)main.cpp								\
+			$(SRC_DIR)Logger.cpp								\
 			$(SRC_DIR)commands/CommandHandler.cpp			\
 			$(SRC_DIR)channel/Channel.cpp					\
 			$(SRC_DIR)replies/Replies.cpp					\
@@ -56,8 +57,8 @@ GREEN	=	'\033[0;32m'
 RED		=	'\033[0;31m'
 NC		=	'\033[0m'
 
-debug: CXXFLAGS += -DDEBUG
-debug: re
+log: CXXFLAGS += -DLOG
+log: re
 
 clean:
 	@rm -rf $(OBJ_DIR)

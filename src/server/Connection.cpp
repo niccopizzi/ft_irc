@@ -7,9 +7,6 @@ Connection::Connection() :  user(),
 {
     connectionPoll = NULL;
     std::memset(&peeraddr, 0, sizeof(peeraddr));
-    #ifdef DEBUG
-        std::cout << "Connection default constructor called\n";
-    #endif
 }
 
 Connection::Connection(int connectionFd, sockaddr_storage* addr) : user(),
@@ -19,9 +16,6 @@ Connection::Connection(int connectionFd, sockaddr_storage* addr) : user(),
 {
     connectionPoll = NULL;
     std::memcpy(&peeraddr, addr, sizeof(peeraddr));
-    #ifdef DEBUG
-        std::cout << "Connection constructor called\n";
-    #endif
 }
 
 Connection::Connection(int connectionFd, connectionID conId, sockaddr_storage* addr) :  user(),
@@ -31,9 +25,6 @@ Connection::Connection(int connectionFd, connectionID conId, sockaddr_storage* a
 {
     connectionPoll = NULL;
     std::memcpy(&peeraddr, addr, sizeof(peeraddr));
-    #ifdef DEBUG
-        std::cout << "Connection constructor called\n";
-    #endif
 }
 
 Connection::Connection(const Connection& connection) :  user(connection.user), 
@@ -43,11 +34,11 @@ Connection::Connection(const Connection& connection) :  user(connection.user),
                                                         fd(connection.fd), 
                                                         id(connection.id)
 {
+    #ifdef LOG
+        logger = connection.logger;
+    #endif
     std::memcpy(buffer, connection.buffer, connection.bytesInBuffer);
     std::memcpy(&peeraddr, &connection.peeraddr, sizeof(peeraddr));
-    #ifdef DEBUG
-        std::cout << "Connection copy constructor called\n";
-    #endif
 }
 
 Connection& Connection::operator=(const Connection& other)
@@ -62,20 +53,17 @@ Connection& Connection::operator=(const Connection& other)
         bytesInBuffer = other.bytesInBuffer;
         msgQueue = other.msgQueue;
         connectionPoll = other.connectionPoll;
+        #ifdef LOG
+            logger = other.logger;
+        #endif
         std::memcpy(buffer, other.buffer, other.bytesInBuffer);
         std::memcpy(&peeraddr, &other.peeraddr, sizeof(peeraddr));
     }
-    #ifdef DEBUG
-        std::cout << "Connection copy operator called\n";
-    #endif
     return (*this);
 }
 
 Connection::~Connection()
 {
-    #ifdef DEBUG
-        std::cout << "Connection destructor called\n";
-    #endif
 }
 
 int Connection::getFd() const
@@ -132,10 +120,14 @@ bool    Connection::isRegistered() const
     return (user.isRegistered());
 }
 
+
 void Connection::enqueueMsg(const std::string& msg)
 {
     msgQueue.push(msg);
     connectionPoll->events |= POLLOUT;
+    #ifdef LOG
+        logger->logMessage("enqueued message", msg.substr(0, msg.find('\n') - 1), id);
+    #endif
 }
 
 void Connection::setConnectionPoll(pollfd* pdf)
@@ -185,6 +177,14 @@ void Connection::setId(connectionID newId)
     if(id == 0)
         id = newId;
 }
+
+#ifdef LOG
+void Connection::setLogger(Logger* logger)
+{
+    this->logger = logger; 
+}
+#endif
+
 
 void Connection::closeConnection()
 {
@@ -245,12 +245,18 @@ ssize_t Connection::dequeueMsg()
         return (0);
     }
     std::string msgToSend(msgQueue.front());
+    #ifdef LOG
+        logger->logMessage("sent message", msgToSend.substr(0, msgToSend.find('\n') - 1), id);
+    #endif
     ret = send(fd, msgToSend.data(), msgToSend.length(), 0);
     if (ret < 0)
         return (ret);
     if ((size_t)ret != msgToSend.length()) //handle data partially sent
     {
         msgQueue.front() = msgQueue.front().substr(ret); //save in the front of the queue the data that was not sent
+        #ifdef LOG
+            logger->logMessage("message sent partially - enqueued the rest", msgQueue.front(), id);
+        #endif
         return (1);
     }
     msgQueue.pop();

@@ -6,10 +6,12 @@
 #include <algorithm>
 #include <map>
 #include <list>
+#include <cstdlib>
 #include <sstream>
 #include "Listener.hpp"
 #include "../commands/CommandHandler.hpp"
 #include "../channel/Channel.hpp"
+#include "../Logger.hpp"
 
 
 #define HOSTNAME "Sambatime"
@@ -51,6 +53,10 @@ public:
     
     void    openPort();
     void    pollEvents();
+
+    #ifdef LOG
+        Logger* logger;
+    #endif
 
     const Listener&                                     getListener() const;
     const std::list<Connection>&                        getConnections() const;

@@ -6,13 +6,21 @@ void    startServer(char* port, char* password)
 {
     Server  theServer(port, password);
 
+    #ifdef LOG
+    Logger logger("./ircserv.log");
+    theServer.logger = &logger; 
+    #endif
+
     try
     {
         theServer.openPort();
     }
     catch(const std::exception& e)
     {
-        std::cerr << "Could not start the server because : " << e.what() << "\nExiting...\n";
+        #ifdef LOG
+            logger.log("Main ", std::string("Error in starting the server ") + e.what());
+        #endif
+        std::cerr << "Could not start server - Exiting...\n" << e.what();
         return;
     }
     registerSignalHandlers();
@@ -25,9 +33,10 @@ void    startServer(char* port, char* password)
         }
         catch(const std::exception& e)
         {
-            std::cerr << e.what() << '\n';
+            #ifdef LOG
+                logger.log("Main", std::string("Caught the following exception : ") + e.what());
+            #endif
         }
-        
     }
     std::cout << "Received exit signal\n" << "--- CLOSING THE SERVER ---\n";
 }
