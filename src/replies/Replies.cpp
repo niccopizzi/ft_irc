@@ -12,7 +12,7 @@ const std::string Replies::CommonErr(const std::string& nickname,
     }
     else if (err == ERR_NEEDMOREPARAMS)
     {
-        reply += " 461 ";
+        reply += "461 ";
         if (!nickname.empty())
             reply += nickname + " ";
         reply += command + " :Not enough parameters\r\n";
@@ -99,7 +99,7 @@ const std::string Replies::PrivMsgErr(const std::string& sender,
         reply += "401 " + sender + " " + recipient + " :No such nick/channel\r\n";
     }
     else if (err == ERR_CANNOTSENDTOCHAN)
-        reply += "404" + sender + " " + recipient + " :Cannot send to chan\r\n";
+        reply += "404 " + sender + " " + recipient + " :Cannot send to chan\r\n";
     return (reply);
 }
 
@@ -170,6 +170,10 @@ const std::string Replies::KickErr(const std::string& name,
     {
         reply += "441 " + name + " " + toKick + " " + chanName + " :They aren't on that channel\r\n";
     }
+    else if (err == ERR_NOTONCHANNEL)
+    {
+        reply += "442 " + name + " " + chanName + " :You're not on that channel\r\n";
+    }
     return (reply);
 }
 
@@ -183,7 +187,7 @@ const std::string Replies::InviteErr(const std::string& nickname,
     if (err == ERR_NOSUCHNICK)
         reply += "401 " + nickname + " " + invited + " :No such nick/channel\r\n";
     else if (err == ERR_NOSUCHCHANNEL)
-        reply += "403 " + nickname, + " " + channel + " :No such channel\r\n";
+        reply += "403 " + nickname + " " + channel + " :No such channel\r\n";
     else if (err == ERR_NOTONCHANNEL)
         reply += "442 " + nickname + " " + channel + " :You are not on that channel\r\n";
     else if (err == ERR_USERONCHANNEL)

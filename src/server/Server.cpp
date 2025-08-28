@@ -152,6 +152,9 @@ void Server::handleClientInteraction(pollfd &activePoll)
         else if (res == READ_ERROR)
         {
             notifyQuit("Client connection error", client);
+            #ifdef LOG
+                logger->logConnection("read error", client.getConnectionId());
+            #endif
             removeConnection(client);
         }
         else if (res == CONNECTION_CLOSED)
@@ -181,16 +184,24 @@ void Server::handleClientCommand(Connection &client, const std::string &msg)
 
     client.clearBuffer();
     args.reserve(10);
+    #ifdef LOG
+        logger->logMessage("message from client", msg.substr(0, msg.size() - 2), client.getConnectionId());
+    #endif
     while (std::getline(ss, line))
     {
+        if (!std::isalpha(*line.begin()))
+            return; //silently fail if line does not start with a char
         if (*(line.end() - 1) == '\r')
             line.erase((line.end() - 1));
         pos = line.find(' ');
-        if (pos != std::string::npos)
+        if (pos != std::string::npos) //split args only if space is present
         {
             cmd = line.substr(0, pos);
             split(&(line.at(pos)), ' ', args);
-            handleSimpleCommand(client, cmd, &args);
+            if (args.empty()) //handle case where after command there are only spaces and no args
+                handleSimpleCommand(client, cmd, NULL);
+            else
+                handleSimpleCommand(client, cmd, &args);
             args.clear();
         }
         else
@@ -288,7 +299,7 @@ void Server::registerConnection(Connection &newConnection)
     bool    reallocationHappened;
     
     reallocationHappened = assignPollToConnection(newConnection);
-    if (reallocationHappened) // reallocation happened need to store the new pointers, skip the last one because we already assigned it to the new Connection
+    if (reallocationHappened) // reallocation happened need to store the new pointers, skip the first one because is reserved for the server listener
     {
         end = (polls.end());
         for (std::vector<pollfd>::iterator it = polls.begin() + 1; it != end; ++it)
@@ -301,6 +312,9 @@ void Server::registerConnection(Connection &newConnection)
 
 void Server::createConnection()
 {
+    if (!listener.isOpen())
+        return;
+        
     try
     {
         Connection newConnection(listener.acceptConnection());

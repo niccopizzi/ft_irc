@@ -1,6 +1,6 @@
 #!/bin/bash
 
-for ((n = 100; n < 200; n++)) do
+for ((n = 1000; n < 2000; n++)) do
     nc -q -1 -C localhost 8080  << END &
 PASS pass
 NICK a$n

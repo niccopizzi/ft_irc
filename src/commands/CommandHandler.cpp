@@ -174,12 +174,15 @@ void CommandHandler::executePass(const std::vector<std::string>* args,
 
 bool    isChanNameValid(const std::string& chanName)
 {
+    std::string::const_iterator end;
+
     if (chanName.size() <= 1 || chanName.size() > 200)
         return (false);
     if (chanName.at(0) != '#' && chanName.at(0) != '&')
         return (false);
-    for (std::string::const_iterator it = chanName.begin();
-        it != chanName.end(); ++it)
+
+    end = chanName.end();
+    for (std::string::const_iterator it = chanName.begin(); it != end; ++it)
     {
         if (*it == 7)
             return (false);
@@ -210,8 +213,10 @@ void    handleJoinArgs(const std::vector<std::string>& channelNames,
     std::string chanName;
     std::string chanKey;
     std::map<std::string, Channel>::iterator it;
+    size_t      chanSize;
 
-    for (size_t i = 0; i < channelNames.size(); ++i)
+    chanSize = channelNames.size();
+    for (size_t i = 0; i < chanSize; ++i)
     {
         chanName = channelNames.at(i);
         if (!isChanNameValid(chanName))
@@ -256,9 +261,9 @@ void    CommandHandler::executeJoin(const std::vector<std::string>* args,
 void CommandHandler::executePing(const std::vector<std::string>* args, Connection& client)
 {
     if (args == NULL)
-        client.enqueueMsg("PONG\r\n");
+        client.enqueueMsg(":localhost PONG localhost\r\n");
     else
-        client.enqueueMsg("PONG :" + args->at(0) + "\r\n");
+        client.enqueueMsg(":localhost PONG localhost :" + args->at(0) + "\r\n");
 }
 
 std::string    catArguments(std::vector<std::string>::const_iterator begin,
@@ -326,7 +331,7 @@ void CommandHandler::executePrivMsg(const std::vector<std::string>* args,
         if (targetChannel == channels.end())
             client.enqueueMsg(Replies::PrivMsgErr(client.getNickname(), target, ERR_NOSUCHNICK));
         else if (!targetChannel->second.isUserInChannel(client.getConnectionId()) && 
-                    (targetChannel->second.getMode() & FLG_EXTERNAL_MSG) == 0)
+                    (targetChannel->second.getMode() & FLG_EXTERNAL_MSG) == 0) //the external message flag is not set
             client.enqueueMsg(Replies::PrivMsgErr(client.getNickname(), target, ERR_CANNOTSENDTOCHAN));
         else
             sendChannelMessage(client, targetChannel->second, args);
@@ -518,7 +523,7 @@ bool handleOpChange(bool set, Connection& client, Channel& chan, const std::stri
     }
     if (!chan.isUserInChannel(it->second->getConnectionId()))
     {
-        client.enqueueMsg(Replies::InviteErr(client.getNickname(), toChange,
+        client.enqueueMsg(Replies::KickErr(client.getNickname(), toChange,
                  chan.getName(), ERR_USERNOTINCHANNEL));
         return(false);
     }
@@ -552,17 +557,20 @@ void handleModeArgs(const std::vector<std::string>* args, Connection& client, Ch
     end = modeString.end();
     set = -1;
 
-    for (; it != end; ++it)
+    for (std::string::const_iterator st = it; st != end; ++st)
     {
-        curr = *it;
-        if (!std::strchr("+-klnito", curr))
+        if (!std::strchr("+-klnito", *st))
         {
-            std::string msg;
-            msg.push_back(curr);
-            msg += " :is an unknown mode char to me\r\n";
+            std::string msg(":localhost 472 " + client.getNickname() + " " + *st
+                            + " :is an unknown mode char to me\r\n");
             client.enqueueMsg(msg);
             return;
         }
+    }
+
+    for (; it != end; ++it)
+    {
+        curr = *it;
         if (curr == '+')
         {
             set = true;
@@ -573,17 +581,17 @@ void handleModeArgs(const std::vector<std::string>* args, Connection& client, Ch
             set = false;
             continue;
         }
-        if (((curr == 'k' || curr == 'l') && set) || curr == 'o')
+        if (((curr == 'k' || curr == 'l') && set == true) || curr == 'o')
         {
-            if (params == argsEnd)
+            if (params == argsEnd) //no param to consume for the mode change. 
             {
                 client.enqueueMsg(Replies::CommonErr(client.getNickname(), "MODE", ERR_NEEDMOREPARAMS));
                 return;
             }
-            param = *params;
-            ++params;
+            param = *params; //set current parameter
+            ++params; //consume one parameter
         }
-        if (set == -1)
+        if (set == -1) //no +/- specified
             continue;
         if (curr == 'o' && !handleOpChange(set, client, chan, param, nickToConn))
             return;

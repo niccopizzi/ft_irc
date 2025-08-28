@@ -111,21 +111,24 @@ void            Listener::setSocketFd(int fd)
     socketFd = fd;
 }
 
+bool    Listener::isOpen() const
+{
+    return (socketFd != -1);
+}
+
 Connection      Listener::acceptConnection() 
 {
     int                     newFd;
     struct sockaddr_storage s;
     socklen_t               addrlen;
 
-    if (socketFd == -1)
-        throw(std::runtime_error("Socket is closed\n"));
     addrlen = sizeof(s);
     newFd = accept(socketFd, (struct sockaddr*)&s, &addrlen);
-    if (newFd == -1)
+    if (newFd == -1) //cannot accept more connections from this socket, stop listening
     {
         close(socketFd);
         socketFd = -1;
-        throw(std::runtime_error(strerror(errno)));
+        throw(std::runtime_error("Reached max socket capacity"));
     }
     fcntl(newFd, F_SETFL, O_NONBLOCK);
     return (Connection(newFd, &s));

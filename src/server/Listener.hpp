@@ -18,6 +18,7 @@ public:
     ~Listener();
 
 
+    bool            isOpen() const;
     void            createSocket(int ai_family = AF_UNSPEC, 
                                  int ai_socktype = SOCK_STREAM);
     void            startListen(int queue) const;

@@ -292,7 +292,7 @@ void Channel::unsetChanMode(char flag, Connection& unsetter)
     default:
         return;
     }
-    if (mode == newMask)
+    if (mode == newMask) //chanop did not change anything, no need to broadcast the message
         return;
     mode = newMask;
     broadCastMessage(":" + unsetter.getMask() + " MODE " + name + " :-" + flag + "\r\n");
