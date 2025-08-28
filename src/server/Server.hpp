@@ -11,8 +11,10 @@
 #include "Listener.hpp"
 #include "../commands/CommandHandler.hpp"
 #include "../channel/Channel.hpp"
-#include "../Logger.hpp"
 
+#ifdef LOG
+    #include "../Logger.hpp"
+#endif
 
 #define HOSTNAME "Sambatime"
 #define TIMEOUT_TIME 60
@@ -29,9 +31,13 @@ private:
     std::map<const std::string, Connection*>        nickToConnection;
     connectionID                                    currentId;
 
+#ifdef LOG
+    Logger* logger;
+#endif
+
     void    createConnection();
-    void    registerConnection(Connection& newConnection,
-                                const pollfd& connectionPoll);
+    void    registerConnection(Connection& newConnection);
+    bool    assignPollToConnection(Connection &newConnection);
     void    deregisterConnection(Connection& client);
     void    removeClientFromChannels(connectionID clientId);
     void    notifyQuit(const std::string& message, const Connection& client) const;
@@ -54,9 +60,9 @@ public:
     void    openPort();
     void    pollEvents();
 
-    #ifdef LOG
-        Logger* logger;
-    #endif
+#ifdef LOG
+    void setLogger(Logger* theLogger);
+#endif
 
     const Listener&                                     getListener() const;
     const std::list<Connection>&                        getConnections() const;

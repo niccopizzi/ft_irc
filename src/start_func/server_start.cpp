@@ -8,7 +8,7 @@ void    startServer(char* port, char* password)
 
     #ifdef LOG
     Logger logger("./ircserv.log");
-    theServer.logger = &logger; 
+    theServer.setLogger(&logger); 
     #endif
 
     try

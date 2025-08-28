@@ -125,9 +125,6 @@ void Connection::enqueueMsg(const std::string& msg)
 {
     msgQueue.push(msg);
     connectionPoll->events |= POLLOUT;
-    #ifdef LOG
-        logger->logMessage("enqueued message", msg.substr(0, msg.find('\n') - 1), id);
-    #endif
 }
 
 void Connection::setConnectionPoll(pollfd* pdf)
@@ -210,16 +207,33 @@ bool    endLineReceived(char* buffer, size_t len)
     return (false);
 }
 
+bool    exitSequenceReceived(char* buffer, size_t len)
+{
+    static unsigned char     sequence[5] = {0xff, 0xf4, 0xff, 0xfd, 0x06};
+
+    if (len < 5)
+        return (false);
+    for (int i = 0; i < 5; ++i)
+    {
+        if (static_cast<unsigned char>(buffer[i]) != sequence[i])
+            return (false);
+    }
+    return (true);
+}
+
 int Connection::handleClientMsg()
 {
     ssize_t  bytes;
 
     if (bytesInBuffer >= 510)
-         return (BUFFER_FULL);
-    bytes = recv(fd, buffer + bytesInBuffer, 512 - bytesInBuffer, 0);
+    {
+        clearBuffer();
+        return (BUFFER_FULL);
+    }
+    bytes = recv(fd, buffer + bytesInBuffer, 512 - bytesInBuffer, 0); //silently truncate messages that exceed the 512 bytes limit
     if (bytes == -1)
         return (READ_ERROR);
-    if (bytes == 0)
+    if (bytes == 0 || exitSequenceReceived(buffer, bytesInBuffer)) //handle EOF and Ctrl+c sequence 
         return (CONNECTION_CLOSED);
     bytesInBuffer += bytes;
     buffer[bytesInBuffer] = 0;

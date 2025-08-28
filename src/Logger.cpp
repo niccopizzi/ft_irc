@@ -1,3 +1,5 @@
+#ifdef LOG
+
 #include "Logger.hpp"
 #include <iostream>
 
@@ -72,3 +74,5 @@ std::string    getTimeStamp(void)
     stringStream << std::setfill('0') << std::setw(2) << t->tm_sec << " " << t->tm_zone;
     return (stringStream.str());
 }
+
+#endif

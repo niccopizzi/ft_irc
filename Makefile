@@ -6,7 +6,7 @@ SRC_DIR = src/
 INCLUDE = -Iinclude
 
 SRC =		$(SRC_DIR)main.cpp								\
-			$(SRC_DIR)Logger.cpp								\
+			$(SRC_DIR)Logger.cpp							\
 			$(SRC_DIR)commands/CommandHandler.cpp			\
 			$(SRC_DIR)channel/Channel.cpp					\
 			$(SRC_DIR)replies/Replies.cpp					\

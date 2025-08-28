@@ -2,7 +2,6 @@
 #define CONNECTION_HPP
 
 #include "../user/User.hpp"
-#include "../Logger.hpp"
 #include <unistd.h>
 #include <fcntl.h>
 #include <cstdlib>
@@ -15,6 +14,9 @@
 #include <ctime>
 #include <queue>
 
+#ifdef LOG
+    #include "../Logger.hpp"
+#endif
 
 #define BUFFER_FULL         -3
 #define READ_ERROR          -2
@@ -37,9 +39,9 @@ private:
     int                         fd;
     connectionID                id; //unique id that identifies the connection
     
-    #ifdef LOG
-        Logger* logger;
-    #endif
+#ifdef LOG
+    Logger* logger;
+#endif
 
     public:
     Connection();
@@ -78,9 +80,9 @@ private:
     bool                isRegistered(void) const;
     int                 handleClientMsg();
 
-    #ifdef LOG
-        void setLogger(Logger* logger);
-    #endif
+#ifdef LOG
+    void setLogger(Logger* logger);
+#endif
 };
 
 #endif
