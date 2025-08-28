@@ -265,6 +265,8 @@ ssize_t Connection::dequeueMsg()
     ret = send(fd, msgToSend.data(), msgToSend.length(), 0);
     if (ret < 0)
         return (ret);
+    if (msgToSend.find("ERROR :") != std::string::npos) //means that the fatal error message has been sent and the connection can be closed
+        return (ERROR_NOTIFIED);
     if ((size_t)ret != msgToSend.length()) //handle data partially sent
     {
         msgQueue.front() = msgQueue.front().substr(ret); //save in the front of the queue the data that was not sent

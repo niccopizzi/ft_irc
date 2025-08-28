@@ -40,7 +40,7 @@ private:
     bool    assignPollToConnection(Connection &newConnection);
     void    deregisterConnection(Connection& client);
     void    removeClientFromChannels(connectionID clientId);
-    void    notifyQuit(const std::string& message, const Connection& client) const;
+    void    notifyQuit(const std::string& reason, const Connection& client) const;
     void    removeConnection(Connection& client);
     void    handleClientInteraction(pollfd& activePoll);
     void    handleSimpleCommand(Connection& client,

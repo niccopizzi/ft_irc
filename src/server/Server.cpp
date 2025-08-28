@@ -126,16 +126,22 @@ void Server::handleClientInteraction(pollfd &activePoll)
     #ifdef LOG
         logger->logConnection("Client hung up", client.getConnectionId());
     #endif
-        notifyQuit(client.getNickname() + " closed connection", client);
+        notifyQuit("Client closed connection", client);
         removeConnection(client);
     }
     if (activePoll.events & POLLOUT)
     {
         res = client.dequeueMsg();
-    #ifdef LOG
-        if (res < 0)
-            logger->log("server", std::string("Error in sending message ") + strerror(errno));
-    #endif
+        if (res == ERROR_NOTIFIED)
+            removeConnection(client);
+        else if (res < 0)
+        {
+            notifyQuit("Client connection error", client);
+            removeConnection(client);
+            #ifdef LOG
+                logger->log("server", std::string("Error in sending message ") + strerror(errno));
+            #endif
+        }
     }
     else if (activePoll.events & POLLIN)
     {
@@ -143,10 +149,13 @@ void Server::handleClientInteraction(pollfd &activePoll)
         if (res == BUFFER_FULL) //buffer here is cleared, send msg to client with error (https://modern.ircdocs.horse/#errinputtoolong-417)
             client.enqueueMsg(":localhost 417 :Input line was too long\r\n");    
         else if (res == READ_ERROR)
+        {
+            notifyQuit("Client connection error", client);
             removeConnection(client);
+        }
         else if (res == CONNECTION_CLOSED)
         {
-            notifyQuit(client.getNickname() + " closed connection", client);
+            notifyQuit("Client closed connection", client);
             removeConnection(client);
         }
         else if (res == ENDLINE_RECEIVED)
@@ -215,7 +224,6 @@ void Server::handleSimpleCommand(Connection &client,
         if (client.isRegistered())
             notifyQuit(getReason(args), client);
         client.enqueueMsg("ERROR :You quit\r\n");
-        removeConnection(client);
     }
     else if (!client.isRegistered()) // block here to prevent non registered clients from executing commands below
     {
@@ -391,7 +399,7 @@ void Server::notifyQuit(const std::string &reason, const Connection &client) con
 {
     const std::string &mask = client.getMask();
 
-    std::string message = ":" + mask + " QUIT :Quit : " + reason + "\r\n";
+    std::string message = ":" + mask + " QUIT :Quit: " + reason + "\r\n";
 
     CommandHandler::notifyUsersInClientChannels(message, channels, client);
 }

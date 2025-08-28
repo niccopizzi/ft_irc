@@ -528,7 +528,7 @@ bool handleOpChange(bool set, Connection& client, Channel& chan, const std::stri
         chan.addOperator(*it->second);
         chan.broadCastMessage(":" + client.getMask() + " MODE " + chan.getName() + " :+o " + toChange + "\r\n");
     }
-    else if (isTargetOp)
+    else if (!set && isTargetOp)
     {
         chan.removeOperator(*it->second);
         chan.broadCastMessage(":" + client.getMask() + " MODE " + chan.getName() + " :-o " + toChange + "\r\n");

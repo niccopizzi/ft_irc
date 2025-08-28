@@ -25,6 +25,8 @@
 #define NO_END               1
 
 
+#define ERROR_NOTIFIED       2
+
 typedef long    connectionID;
 
 class Connection
