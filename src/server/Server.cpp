@@ -23,6 +23,7 @@ Server::Server(const Server &server) : listener(server.listener),
                                        nickToConnection(server.nickToConnection),
                                        currentId(server.currentId)
 {
+
 }
 
 Server &Server::operator=(const Server &other)
@@ -253,12 +254,11 @@ void Server::handleSimpleCommand(Connection &client,
 
 bool Server::assignPollToConnection(Connection &newConnection)
 {
-    size_t  capacity;
+    size_t  needToReallocate;
     std::vector<pollfd>::iterator end(polls.end());
     pollfd  newPoll;
 
-    capacity = polls.capacity();
-
+    
     for (std::vector<pollfd>::iterator it = polls.begin() + 1; it != end; ++it)
     {
         if (it->fd == -1) //unusued poll, assign this one to the Connection instead of creating a new one
@@ -266,15 +266,20 @@ bool Server::assignPollToConnection(Connection &newConnection)
             it->fd = newConnection.getFd();
             it->events = POLLIN;
             newConnection.setConnectionPoll(&(*it));
+            connections.push_back(newConnection);
+            fdToConnection.insert(std::pair<int, Connection *>(newConnection.getFd(), &connections.back()));
             return (false);
         }
     }
+    needToReallocate = (polls.capacity() <= (polls.size() + 1));
     newPoll.fd = newConnection.getFd();
     newPoll.events = POLLIN;
     newPoll.revents = 0;
     polls.push_back(newPoll);
     newConnection.setConnectionPoll(&polls.back());
-    return (capacity == 0);
+    connections.push_back(newConnection);
+    fdToConnection.insert(std::pair<int, Connection *>(newConnection.getFd(), &connections.back()));
+    return (needToReallocate);
 }
 
 void Server::registerConnection(Connection &newConnection)
@@ -285,15 +290,13 @@ void Server::registerConnection(Connection &newConnection)
     reallocationHappened = assignPollToConnection(newConnection);
     if (reallocationHappened) // reallocation happened need to store the new pointers, skip the last one because we already assigned it to the new Connection
     {
-        end = (polls.end() - 1);
-        for (std::vector<pollfd>::iterator it = polls.begin(); it != end; ++it)
+        end = (polls.end());
+        for (std::vector<pollfd>::iterator it = polls.begin() + 1; it != end; ++it)
         {
-            Connection &mappedConn = *(fdToConnection.find(it->fd)->second);
-            mappedConn.setConnectionPoll(&(*it));
+            Connection* mappedConn = (fdToConnection.find(it->fd)->second);
+            mappedConn->setConnectionPoll(&(*it));
         }
     }
-    connections.push_back(newConnection);
-    fdToConnection.insert(std::pair<int, Connection *>(newConnection.getFd(), &connections.back()));
 }
 
 void Server::createConnection()

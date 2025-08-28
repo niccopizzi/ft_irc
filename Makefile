@@ -1,5 +1,5 @@
 CXX = c++
-CXXFLAGS = -g -Wall -Wextra -std=c++98 $(INCLUDE)
+CXXFLAGS = -Wall -Wextra -std=c++98 -O2 $(INCLUDE)
 
 OBJ_DIR = obj/
 SRC_DIR = src/

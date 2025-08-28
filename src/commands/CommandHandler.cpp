@@ -523,12 +523,12 @@ bool handleOpChange(bool set, Connection& client, Channel& chan, const std::stri
         return(false);
     }
     isTargetOp = chan.isUserOperator(it->second->getConnectionId());
-    if (set && !isTargetOp)
+    if (set && !isTargetOp) //user is trying to give channel operator to another user 
     {
         chan.addOperator(*it->second);
         chan.broadCastMessage(":" + client.getMask() + " MODE " + chan.getName() + " :+o " + toChange + "\r\n");
     }
-    else if (!set && isTargetOp)
+    else if (!set && isTargetOp) //user is trying to remove channel operator status
     {
         chan.removeOperator(*it->second);
         chan.broadCastMessage(":" + client.getMask() + " MODE " + chan.getName() + " :-o " + toChange + "\r\n");
@@ -540,7 +540,7 @@ void handleModeArgs(const std::vector<std::string>* args, Connection& client, Ch
             const std::map<const std::string, Connection*> nickToConn)
 {
     char    curr;
-    bool    set;
+    int     set;
     const std::string& modeString = args->at(1);
     std::vector<std::string>::const_iterator params = args->begin() + 2;
     std::vector<std::string>::const_iterator argsEnd = args->end();
@@ -550,6 +550,7 @@ void handleModeArgs(const std::vector<std::string>* args, Connection& client, Ch
 
     it = modeString.begin();
     end = modeString.end();
+    set = -1;
 
     for (; it != end; ++it)
     {
@@ -582,6 +583,8 @@ void handleModeArgs(const std::vector<std::string>* args, Connection& client, Ch
             param = *params;
             ++params;
         }
+        if (set == -1)
+            continue;
         if (curr == 'o' && !handleOpChange(set, client, chan, param, nickToConn))
             return;
         else
