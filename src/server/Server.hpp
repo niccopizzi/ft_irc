@@ -13,7 +13,7 @@
 #include "../channel/Channel.hpp"
 
 #ifdef LOG
-    #include "../Logger.hpp"
+    #include "../logger/Logger.hpp"
 #endif
 
 #define HOSTNAME "Sambatime"

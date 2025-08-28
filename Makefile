@@ -6,7 +6,6 @@ SRC_DIR = src/
 INCLUDE = -Iinclude
 
 SRC =		$(SRC_DIR)main.cpp								\
-			$(SRC_DIR)Logger.cpp							\
 			$(SRC_DIR)commands/CommandHandler.cpp			\
 			$(SRC_DIR)channel/Channel.cpp					\
 			$(SRC_DIR)replies/Replies.cpp					\
@@ -16,7 +15,8 @@ SRC =		$(SRC_DIR)main.cpp								\
 			$(SRC_DIR)start_func/args_check.cpp				\
 			$(SRC_DIR)start_func/server_start.cpp			\
 			$(SRC_DIR)user/User.cpp							\
-			$(SRC_DIR)signals/signals.cpp
+			$(SRC_DIR)signals/signals.cpp					\
+			$(SRC_DIR)logger/Logger.cpp						\
 
 OBJ = $(addprefix $(OBJ_DIR), $(SRC:.cpp=.o))
 

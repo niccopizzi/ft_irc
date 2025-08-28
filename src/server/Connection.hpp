@@ -15,7 +15,7 @@
 #include <queue>
 
 #ifdef LOG
-    #include "../Logger.hpp"
+    #include "../logger/Logger.hpp"
 #endif
 
 #define BUFFER_FULL         -3
