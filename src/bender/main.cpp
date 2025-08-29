@@ -1,5 +1,8 @@
 #include "Bender.hpp"
+#include "./bender_signals/bender_sig.hpp"
 #include "./bender_types/BenderFactory.hpp"
+
+volatile sig_atomic_t benderShouldRun = 1;
 
 int main(int argc, char* argv[])
 {
@@ -10,11 +13,12 @@ int main(int argc, char* argv[])
     
     std::srand(time(NULL));
     
+    registerSignalHandlers();
     Bender* bender = BenderFactory::getBender(storage.pass, storage.port, storage.lvl);
     try
     {
         bender->connectToServer();
-        while (true)
+        while (benderShouldRun)
         {
             bender->pollEvents();
         }

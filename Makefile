@@ -28,6 +28,7 @@ BENDER_SRC = $(SRC_DIR)bender/Bender.cpp						\
 			$(SRC_DIR)bender/bender_types/GandhiBender.cpp		\
 			$(SRC_DIR)bender/bender_types/SatanBender.cpp		\
 			$(SRC_DIR)bender/infochan/ChannelInfo.cpp			\
+			$(SRC_DIR)bender/bender_signals/bender_sig.cpp		\
 			$(SRC_DIR)bender/bender_helper.cpp					\
 			$(SRC_DIR)bender/main.cpp
 
