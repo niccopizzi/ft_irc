@@ -24,6 +24,7 @@ void BobBender::handleModeChange(const std::vector<std::string>& msg)
     if (args.modeChanged == ":+o" && args.target == name)
     {
         channelsOperated.insert(args.channel);
+        enqueueMsg("PRIVMSG " + args.channel + " :Hey, thank you, I am a channel operator now!\r\n");
     }
     else if (args.modeChanged == ":-o" && args.target == name)
     {
@@ -33,11 +34,27 @@ void BobBender::handleModeChange(const std::vector<std::string>& msg)
         enqueueMsg("PRIVMSG " + args.channel + " :Mhhh, ok!\r\n");
 }
 
+std::string BobBender::genReplyMessage()
+{
+    static const char* theSub[] = {"My dog", "My wife", "My house", "My car", "My boring life"};
+    static const char* theVerb[] = {" is", " likes", " has"};
+    static const char* theObj[] = {" a fancy puppy\r\n", " a great person\r\n", 
+                                    " a garage\r\n", " an insurance that covers all the problems\r\n", " a horse with no name\r\n"};
+
+    std::string theReply(" :");
+
+    theReply += theSub[rand() % 5];
+    theReply += theVerb[rand() % 3];
+    theReply += theObj[rand() % 4];
+
+    return (theReply);
+}
+
 void BobBender::handlePrivateMsg(const std::vector<std::string>& msg)
 {
     std::string sender(msg.at(0).substr(1, msg.at(0).find('!') - 1));
 
-    enqueueMsg("PRIVMSG " + sender + " :Ciao!\r\n");
+    enqueueMsg("PRIVMSG " + sender + genReplyMessage());
 }
 
 void BobBender::handleLastSeen(const std::string& chanName,
@@ -73,20 +90,12 @@ void BobBender::handleChannelMsg(const std::vector<std::string>& msg)
     it->second->updateMemberInteractions(sender.substr(0, sender.find('!'))); //update the value of the interactions
     if (message.compare(0, 2, ":!") == 0)
     {
-        if (message.compare(0, 18, ":!russianroulette") == 0)
-        {
-            if (channelsOperated.find(channel) != channelsOperated.end())
-                enqueueMsg("KICK " + channel + " " + it->second->getRandomUser() + "\r\n");
-            else
-                enqueueMsg("PRIVMSG " + channel + " :" + "Sorry I am not a channel operator\r\n");
-        }
-        else if (message.compare(0, 11, ":!datetime") == 0)
+        if (message.compare(0, 11, ":!datetime") == 0)
             enqueueMsg("PRIVMSG " + channel + " :" + getTimeStamp() + "\r\n");
         else if (message.compare(0, 11, ":!lastseen") == 0)
             handleLastSeen(it->first, it->second, msg);
         else if (message.compare(0, 13, ":!mostactive") == 0)
-            enqueueMsg("PRIVMSG " + channel + " :" 
-                        + "Most active user : " + it->second->getMostActiveUser() + "\r\n"); 
+            enqueueMsg("PRIVMSG " + channel + " :Most active user : " + it->second->getMostActiveUser() + "\r\n"); 
     }
 }
 

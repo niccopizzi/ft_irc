@@ -161,7 +161,6 @@ void Bender::handleServerReply()
     if (ret == 0)
         throw std::runtime_error("they got us! Server closed the connection!!");
     msgBuf[ret] = 0;
-    std::cout << "message from the server\n" << msgBuf;
     std::stringstream ss(msgBuf);
     if (!ss.str().find('\n'))
         return;

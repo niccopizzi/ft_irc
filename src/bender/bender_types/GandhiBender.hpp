@@ -10,6 +10,8 @@ class GandhiBender : public Bender
         GandhiBender(const GandhiBender& bbender);
         GandhiBender& operator=(const GandhiBender& bbender);
 
+        std::string genReplyMessage();
+
     public:
         GandhiBender(const std::string& password, const char* port);
         ~GandhiBender();

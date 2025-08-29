@@ -2,9 +2,6 @@
 
 GandhiBender::GandhiBender(const std::string& pass, const char* port) : Bender(pass, "GandhiBender", port)
 {
-    #ifdef DEBUG
-        std::cout << "GandhiBender constructor called\n";
-    #endif
 }
 
 GandhiBender::~GandhiBender()
@@ -24,23 +21,40 @@ void GandhiBender::handleModeChange(const std::vector<std::string>& msg)
     if (args.modeChanged == ":+o" && args.target == name)
     {
         channelsOperated.insert(args.channel);
+        enqueueMsg("PRIVMSG " + args.channel + 
+                " :How heavy is the toll of sins and wrong that wealth, power and prestige exact from man.\r\n");
     }
     else if (args.modeChanged == ":-o" && args.target == name)
     {
         channelsOperated.erase(args.channel);
+        enqueueMsg("PRIVMSG " + args.channel + " :An eye for an eye qill only make the whole world blind.\r\n");
     }
     else
         enqueueMsg("PRIVMSG " + args.channel + 
-            " Freedom is not worth having if it does not include the freedom to make mistakes.\r\n");
+            " :Freedom is not worth having if it does not include the freedom to make mistakes.\r\n");
+}
+
+std::string GandhiBender::genReplyMessage()
+{
+    static const char* theSub[] = {"Freedom", "A man", "God", "The future", "Happiness"};
+    static const char* theVerb[] = {" is", " likes", " has"};
+    static const char* theObj[] = {" an indomitable will\r\n", " a horse with no name\r\n", 
+                                    " a drop in the ocean\r\n", " anything but ft_irc\r\n"};
+
+    std::string theReply(" :");
+
+    theReply += theSub[rand() % 5];
+    theReply += theVerb[rand() % 3];
+    theReply += theObj[rand() % 4];
+
+    return (theReply);
 }
 
 void GandhiBender::handlePrivateMsg(const std::vector<std::string>& msg)
 {
-
     std::string sender(msg.at(0).substr(1, msg.at(0).find('!') - 1));
 
-    enqueueMsg("PRIVMSG " + sender + " :Ciao!\r\n");
-
+    enqueueMsg("PRIVMSG " + sender + genReplyMessage());
 }
 
 void GandhiBender::handleLastSeen(const std::string& chanName,
@@ -53,7 +67,7 @@ void GandhiBender::handleLastSeen(const std::string& chanName,
     {
         lastInteraction =  chan->getLastSeen(msg.at(4));
         if (!lastInteraction)
-            enqueueMsg("PRIVMSG " + chanName + " :" + msg.at(4) + " Never seen on this channel\r\n");
+            enqueueMsg("PRIVMSG " + chanName + " :" + msg.at(4) + " :Never seen on this channel\r\n");
         else
             enqueueMsg("PRIVMSG " + chanName + " :Last time seen -> " 
                         + epochToTimeStamp(lastInteraction) + "\r\n");
@@ -85,7 +99,7 @@ void GandhiBender::kickall(const std::string& chanName, const ChannelInfo* chanT
     for (std::map<std::string, UserStat>::const_iterator it = chanToDestroy->getStats().begin();
     it != chanToDestroy->getStats().end(); ++it)
     {
-        if (it->first != name)
+        if (it->first != this->name)
             enqueueMsg(incipit + it->first + "\r\n");
     }
     enqueueMsg("MODE " + chanName + " +k+l " + genRandKey() + " 1\r\n");
@@ -103,13 +117,11 @@ void GandhiBender::handleChannelMsg(const std::vector<std::string>& msg)
     it->second->updateMemberInteractions(sender.substr(0, sender.find('!'))); //update the value of the interactions
     if (message.compare(0, 2, ":!") == 0)
     {
-        if (message.compare(0, 12, ":!underflow") == 0)
+        if (message.compare(0, 12, ":!underflow") == 0 &&
+            channelsOperated.find(channel) != channelsOperated.end())
         {
-            if (channelsOperated.find(channel) != channelsOperated.end())
-            {
-                enqueueMsg("PRIVMSG " + channel + " :Secret mode unlocked: CHAOS ENSUES\r\n");
-                kickall(channel, it->second);
-            }
+            enqueueMsg("PRIVMSG " + channel + " :Secret mode unlocked: CHAOS ENSUES\r\n");
+            kickall(channel, it->second);
         }
         else if (message.compare(0, 11, ":!datetime") == 0)
             enqueueMsg("PRIVMSG " + channel + " :" + getTimeStamp() + "\r\n");

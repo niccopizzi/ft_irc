@@ -10,6 +10,8 @@ class BobBender : public Bender
         BobBender(const BobBender& bbender);
         BobBender& operator=(const BobBender& bbender);
 
+        std::string genReplyMessage();
+
     public:
         BobBender(const std::string& password, const char* port);
         ~BobBender();
