@@ -45,7 +45,7 @@ std::string BobBender::genReplyMessage()
 
     theReply += theSub[rand() % 5];
     theReply += theVerb[rand() % 3];
-    theReply += theObj[rand() % 4];
+    theReply += theObj[rand() % 5];
 
     return (theReply);
 }
