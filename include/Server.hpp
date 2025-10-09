@@ -9,15 +9,16 @@
 #include <cstdlib>
 #include <sstream>
 #include "Listener.hpp"
-#include "../commands/CommandHandler.hpp"
-#include "../channel/Channel.hpp"
+#include "CommandHandler.hpp"
+#include "Channel.hpp"
 
 #ifdef LOG
     #include "../logger/Logger.hpp"
 #endif
 
 #define HOSTNAME "Sambatime"
-#define TIMEOUT_TIME 60
+#define EVENT_TIMEOUT_TIME (1000) //time in millisecond, timeout every second
+#define TIMEOUT_TIME (60) //time in seconds, timeout after 1 minute of inactivity
 
 class Server
 {
@@ -47,8 +48,10 @@ private:
                                 const std::string& cmd,
                                 const std::vector<std::string>* args);
     void    handleClientCommand(Connection& client, const std::string& msg);
-    
+    void    checkForTimeouts();
+
     void    printserver() const;
+
 
 public:
     Server(); 

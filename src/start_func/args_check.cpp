@@ -1,4 +1,4 @@
-#include "../irc.hpp"
+#include "irc.hpp"
 
 bool    isPortValid(char* port)
 {
@@ -31,6 +31,11 @@ bool    isPortValid(char* port)
     }
     return (true);
 }
+
+//check that there the port and the pass were given and that 
+//the port is > 1024 (avoid using port less then 1024 because those ports
+//are for the standard service) && < INT_MAX
+//the pass must not be empty 
 
 bool    areArgsValid(int argc, char* argv[])
 {

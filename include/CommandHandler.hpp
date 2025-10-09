@@ -5,8 +5,8 @@
 #include <vector>
 #include <map>
 #include <sstream>
-#include "../channel/Channel.hpp"
-#include "../replies/Replies.hpp"
+#include "Channel.hpp"
+#include "Replies.hpp"
 
 class CommandHandler
 {

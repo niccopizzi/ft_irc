@@ -5,8 +5,8 @@
 #include <map>
 #include <string>
 #include <set>
-#include "../server/Connection.hpp"
-#include "../replies/Replies.hpp"
+#include "Connection.hpp"
+#include "Replies.hpp"
 
 #define FLG_INVITE_ONLY     1
 #define FLG_TOPIC_RESTRICT  (1 << 1)

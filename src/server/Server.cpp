@@ -98,14 +98,31 @@ void Server::openPort()
 #endif
 }
 
+void Server::checkForTimeouts()
+{
+    time_t  currTime = std::time(NULL);
+
+    for (std::list<Connection>::iterator it = connections.begin();
+        it != connections.end(); ++it)
+    {
+        if (currTime - it->getTimeOfLastInteraction() >= TIMEOUT_TIME)
+        {
+            std::cout << "Closing connection for client " << it->getFullname() << "\n";
+            if (it->isRegistered())
+                notifyQuit("Connection timeout", *it);
+            it->enqueueMsg("ERROR :Timeout\r\n");
+        }
+    }
+}
+
 void Server::pollEvents()
 {
     int ret;
 
-    ret = poll(polls.data(), polls.size(), -1);
+    ret = poll(polls.data(), polls.size(), EVENT_TIMEOUT_TIME);
     if (ret == -1)
         throw(std::runtime_error("Poll error"));
-    for (size_t i = 0; i < polls.size(); ++i)
+    for (size_t i = 0; i < polls.size(); i++)
     {
         if (polls.at(i).revents != 0) //io event happened on fd
         {
@@ -115,6 +132,7 @@ void Server::pollEvents()
                 handleClientInteraction(polls.at(i));
         }
     }
+    checkForTimeouts();
 }
 
 void Server::handleClientInteraction(pollfd &activePoll)
@@ -130,6 +148,7 @@ void Server::handleClientInteraction(pollfd &activePoll)
         notifyQuit("Client closed connection", client);
         removeConnection(client);
     }
+    client.updateTimeOfLastInteraction();
     if (activePoll.events & POLLOUT)
     {
         res = client.dequeueMsg();

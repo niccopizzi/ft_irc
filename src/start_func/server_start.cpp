@@ -1,6 +1,6 @@
-#include "../irc.hpp"
+#include "irc.hpp"
 
-volatile sig_atomic_t serverShouldRun = 1;
+volatile sig_atomic_t serverShouldRun = true; //variable used to exit from the main loop if a Ctrl+c is received
 
 void    startServer(char* port, char* password)
 {
@@ -20,7 +20,7 @@ void    startServer(char* port, char* password)
         #ifdef LOG
             logger.log("Main ", std::string("Error in starting the server ") + e.what());
         #endif
-        std::cerr << "Could not start server - Exiting...\n" << e.what();
+        std::cerr << "Could not start server - Exiting...\n" << e.what() << '\n';
         return;
     }
     registerSignalHandlers();

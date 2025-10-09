@@ -15,6 +15,7 @@ Connection::Connection(int connectionFd, sockaddr_storage* addr) : user(),
                                                                     id(0)
 {
     connectionPoll = NULL;
+    timeOfLastInteraction = std::time(NULL);
     std::memcpy(&peeraddr, addr, sizeof(peeraddr));
 }
 
@@ -24,6 +25,7 @@ Connection::Connection(int connectionFd, connectionID conId, sockaddr_storage* a
                                                                                         id(conId) 
 {
     connectionPoll = NULL;
+    timeOfLastInteraction = std::time(NULL);
     std::memcpy(&peeraddr, addr, sizeof(peeraddr));
 }
 
@@ -37,6 +39,7 @@ Connection::Connection(const Connection& connection) :  user(connection.user),
     #ifdef LOG
         logger = connection.logger;
     #endif
+    this->timeOfLastInteraction = connection.timeOfLastInteraction;
     std::memcpy(buffer, connection.buffer, connection.bytesInBuffer);
     std::memcpy(&peeraddr, &connection.peeraddr, sizeof(peeraddr));
 }
@@ -53,6 +56,7 @@ Connection& Connection::operator=(const Connection& other)
         bytesInBuffer = other.bytesInBuffer;
         msgQueue = other.msgQueue;
         connectionPoll = other.connectionPoll;
+        timeOfLastInteraction = other.timeOfLastInteraction;
         #ifdef LOG
             logger = other.logger;
         #endif
@@ -103,6 +107,11 @@ const std::string& Connection::getFullname() const
 const std::string&  Connection::getMask() const
 {
     return (user.getMask());
+}
+
+time_t Connection::getTimeOfLastInteraction() const
+{
+    return (timeOfLastInteraction);
 }
 
 std::queue<std::string>& Connection::getQueue()
@@ -175,6 +184,12 @@ void Connection::setId(connectionID newId)
         id = newId;
 }
 
+//set the last interaction to now
+void Connection::updateTimeOfLastInteraction()
+{
+    timeOfLastInteraction = std::time(NULL);
+}
+
 #ifdef LOG
 void Connection::setLogger(Logger* logger)
 {
@@ -207,7 +222,10 @@ bool    endLineReceived(char* buffer, size_t len)
     return (false);
 }
 
-bool    exitSequenceReceived(char* buffer, size_t len)
+//Telnet sends a sequence of 5 bytes to signal a Ctrl+c received from the user
+//This functions is to check if the sequence has been received and in case close
+//the connection
+bool    exitSequenceReceived(char* buffer, size_t len)  
 {
     static unsigned char     sequence[5] = {0xff, 0xf4, 0xff, 0xfd, 0x06};
 

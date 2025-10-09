@@ -1,7 +1,7 @@
 #ifndef CONNECTION_HPP
 #define CONNECTION_HPP
 
-#include "../user/User.hpp"
+#include "User.hpp"
 #include <unistd.h>
 #include <fcntl.h>
 #include <cstdlib>
@@ -15,7 +15,7 @@
 #include <queue>
 
 #ifdef LOG
-    #include "../logger/Logger.hpp"
+    #include "Logger.hpp"
 #endif
 
 #define BUFFER_FULL         -3
@@ -40,6 +40,7 @@ private:
     std::queue<std::string>     msgQueue;
     int                         fd;
     connectionID                id; //unique id that identifies the connection
+    time_t                      timeOfLastInteraction;
     
 #ifdef LOG
     Logger* logger;
@@ -64,6 +65,7 @@ private:
     const std::string&  getNickname() const;
     const std::string&  getFullname() const;
     const std::string&  getMask()   const;
+    time_t              getTimeOfLastInteraction() const;
     void                setConnectionPoll(pollfd* pdf);
     void                setId(connectionID newId);
     void                setFd(int fd);
@@ -72,6 +74,7 @@ private:
     void                setUsername(const std::string& username);
     void                setFullname(const std::string& fullname);
     void                setMask(const std::string& mask);
+    void                updateTimeOfLastInteraction();
     void                enqueueMsg(const std::string& msg);
     ssize_t             dequeueMsg();
     void                setAuth(bool auth);
