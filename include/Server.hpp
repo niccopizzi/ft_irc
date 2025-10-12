@@ -20,6 +20,8 @@
 #define EVENT_TIMEOUT_TIME (1000) //time in millisecond, timeout every second
 #define TIMEOUT_TIME (60) //time in seconds, timeout after 1 minute of inactivity
 
+#define POLL_TIMEOUT_RET_VAL 0
+
 class Server
 {
 private:

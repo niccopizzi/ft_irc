@@ -60,7 +60,7 @@ void            Listener::createSocket(int ai_family, int ai_socktype)
     hints.ai_flags = AI_PASSIVE;
     err = getaddrinfo(hostname, port, &hints, &info);
     if (err != 0)
-        throw std::runtime_error(gai_strerror(err));
+        throw std::runtime_error("Error in getting the address info");
     for (it = info; it != NULL; it = it->ai_next)
     {
         socketFd = socket(it->ai_family, it->ai_socktype | SOCK_NONBLOCK, it->ai_protocol);

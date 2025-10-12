@@ -1,0 +1,232 @@
+At the highest level this project is all about handling client interactions.
+This means that the all purpose of the project is to create a program that listens on a PORT 
+and gives a client the opportunity to connect to this port and send a predifined set of commands
+that the program will handle.
+
+
+CLASSES JOBS
+
+CONNECTION
+
+- Handles the processing of the client message 
+- Handles the queueing/dequeueing of messages  
+- Signals to the server the state of the connection (connection closed/message received etc.)
+
+USER
+
+- Stores the relevant information about the client (nickname/username)
+- Stores the current state of the User (Authenticated/Registered)
+
+
+
+THE CONNECTION CLASS 
+
+The connection class is the one responsible for handling the client interaction on
+the server. It has the following private attributes 
+
+    sockaddr_storage            peeraddr; -> Ip address of the client
+    User                        user;     -> Class that holds all the info for the user
+    std::string                 clientMessage; -> the message the client sent us
+    size_t                      bytesInBuffer; (more below)
+    pollfd*                     connectionPoll; (more below)
+    std::queue<std::string>     msgQueue; -> A list of messages we have to send to the client
+    int                         fd; -> The file descriptor of the socket (more below) 
+    connectionID                id; //unique id that identifies the connection
+    time_t                      timeOfLastInteraction; -> keeps track of the last time the client was active
+                                                          we use this to check for timeouts
+
+
+One thing to know is that all the exchange of informations is being done on sockets, we can think of them as a file
+where the server and the client can read from/write to in order to communicate, and the fd stored in the connection class
+is in fact the file descriptor referring to the socket for this specific connection. 
+
+THE MESSAGE BUFFER
+
+There is also one public attribute 
+    
+        char    buffer[513] 
+
+Which is the buffer we are using to store the bytes we received from the client
+This is needed because sometimes the clients can send us messages that are split
+in multiple packets so in order to make sure we handle them correctly we have the
+attribute bytesInBuffer which tells us how many bytes we stored until now.
+The buffer is 513 bytes because there's a rule in the irc docs that states that a 
+message can have a maximum length of 512 bytes, so we have 1 byte more to make sure that we are able
+to catch a message longer than the maximum allowed (with only 512 we could not tell if the message is
+512 bytes long or more), if we catch such a nasty message we will close the connection out of disgust
+for our client. 
+
+HADLING CLIENT'S MESSAGE 
+
+The all purpose of this class is to be able to deal with a client message, we do that with the 
+method 
+
+int Connection::handleClientMsg()
+{
+    ssize_t  bytes;
+
+    if (bytesInBuffer >= 510)
+    {
+        clearBuffer();
+        return (BUFFER_FULL);
+    }
+    bytes = recv(fd, buffer + bytesInBuffer, 512 - bytesInBuffer, 0);
+    if (bytes == -1)
+        return (READ_ERROR);
+    if (bytes == 0 || exitSequenceReceived(buffer, bytesInBuffer))
+        return (CONNECTION_CLOSED);
+    bytesInBuffer += bytes;
+    buffer[bytesInBuffer] = 0;
+    if (endLineReceived(buffer, bytesInBuffer))
+        return (ENDLINE_RECEIVED);
+    return (NO_END);
+}
+
+The first check is to make sure, as said before, that the message's bytes are in the max possible
+We check if the bytes are >= 510 because each message ends with \r\n so each message is at least 3 bytes long
+(1 for the message and 2 for the endline \r\n), if we already have 510 bytes in the buffer we cannot handle more
+and we clear the buffer and close the connection (the server will take care of closing the connection)
+
+We than call recv with the fd of the socket of the connection and then buffer + bytesInBuffer, so we basically
+add to the buffer pointer the bytes of data we already stored in the buffer, in this way we make sure that we 
+don't overwrite any data we previously stored 
+
+We then check for error or for a sign of the client closing the connection, this could happen in two different ways
+
+    1) the number of bytes read is 0
+    2) We received the exit sequence, this is a specific case and it refers to a connection from a client that is using
+       telnet (who tf uses telnet in 2025 by the way?) and sends a Ctrl+C, telnet will send actually a message to our
+       server with this pattern 0xff, 0xf4, 0xff, 0xfd, 0x06 so we loop the bytes of the message and if they match this
+       sequence we know we have to ask the server to close the connection (we do this by returns CONNECTION_CLOSED) the 
+       method that checks for this sequence is this exitSequenceReceived
+
+    bool    exitSequenceReceived(char* buffer, size_t len)  
+    {
+        static unsigned char     sequence[5] = {0xff, 0xf4, 0xff, 0xfd, 0x06};
+
+        if (len < 5)
+            return (false);
+        for (int i = 0; i < 5; ++i)
+        {
+            if (static_cast<unsigned char>(buffer[i]) != sequence[i])
+                return (false);
+        }
+        return (true);
+    }
+
+If no error happened and the connection was not closed we need to check if we got a endline, pretty simple, we just
+check if there's a '\n' character in the buffer or if there is a sequence "\r\n", this is the method that checks it 
+
+bool    endLineReceived(char* buffer, size_t len)
+{
+    for (size_t i = 0; i < len ; ++i)
+    {
+        if (buffer[i] == '\n' ||
+            (buffer[i] == '\r' && buffer[i + 1] == '\n'))
+        {
+            return(true);
+        }
+    }
+    return (false);
+}
+
+THE MESSAGE QUEUE
+
+Last thing to know about the Connection class is that if there's a message to send to a client we cannot send it 
+directly (that would be too easy!) we actually need to wait for the client to tell us that it's ready to get a message, 
+for this reason the Connection class has a queue attribute
+
+    std::queue<std::string>     msgQueue;
+
+and two methods 
+
+    void                enqueueMsg(const std::string& msg);
+    ssize_t             dequeueMsg();
+
+The first one is super easy, when we have a message to send to the client we'll just call this method and store it for later
+when we can send a message to the client. This is the method
+
+void Connection::enqueueMsg(const std::string& msg)
+{
+    msgQueue.push(msg);
+    connectionPoll->events |= POLLOUT;
+}
+
+We push the message into the queue and then we add the POLLOUT flag to the connectionPoll, this is just used to make sure 
+that when we are checking for events that happened on the socket we are checking also for when the client said that it can
+receive a message from us 
+
+The other one is the opposite but it has to take care of some little more details, this is the method 
+
+ssize_t Connection::dequeueMsg()
+{
+    ssize_t ret;
+
+    if (msgQueue.empty())
+    {
+        std::cout << "called with empty queue\n";
+        connectionPoll->events = POLLIN;
+        return (0);
+    }
+    std::string msgToSend(msgQueue.front());
+    ret = send(fd, msgToSend.data(), msgToSend.length(), 0);
+    if (ret < 0)
+        return (ret);
+    if (msgToSend.find("ERROR :") != std::string::npos)
+        return (ERROR_NOTIFIED);
+    if ((size_t)ret != msgToSend.length())
+    {
+        msgQueue.front() = msgQueue.front().substr(ret);
+        return (1);
+    }
+    msgQueue.pop();
+    if (msgQueue.empty())
+    {
+        connectionPoll->events = POLLIN;
+    }
+    return (1);
+}
+
+The first if is probably useless to be honest but you know... better safe than sorry.
+Basically we get the message on front of the queue and send it to the client, after the message
+was sent we need to check if there was an error (ret < 0) or if we sent the message "ERROR :" 
+This is a special message and it is required to comply with the irc rules. Da rules states that
+if a client closes the connection the server has to reply with the message "ERROR : You quit" (like wtf?)
+and only AFTER this message has been sent to the client we can close the connection, for this reason we 
+check here if this message was sent (we just check for "ERROR" since this is a message we send from the
+server every time there's a fatal error that requires us to close the connection with the client). That's 
+why there's this check if (msgToSend.find("ERROR :") != std::string::npos) in the function.
+
+We also need to make sure that we handle the case that we sent just a partial message. This is quite easy to do
+we just check if the amount of bytes sent is not equal to the message length, if that's the case we will store
+back in front of the queue the string we were not able to send 
+
+    msgQueue.front() = msgQueue.front().substr(ret); 
+
+Last thing we do is to pop the message queue and check if it's empty, because in that case we have nothing to
+send to the client and we want to check only when the client wants to send us something, that's what 
+connectionPoll->events = POLLIN; is doing
+
+
+THE USER CLASS
+
+This class is super easy and is just needed to store the user information, this class has these
+attributes :
+
+    std::string                 nickname;
+    std::string                 username;
+    std::string                 fullname;
+    std::string                 mask; (irc stuff, it's just nickname + "!" + username + "@localhost")
+    bool                        didAuthenticate; (most important part of the class)
+
+A user can be 
+
+    1) Not Authenticated -> Did not even insert the password to access the server (the first thing to do)
+    2) Authenticated     -> Did insert the correct password and is now in the server but still has not given us a nickname
+                            nor a username
+    3) Registered        -> A user that Authenticated and has given us a nickname and a username 
+
+It's important to keep track of the state of the user because a user has access to different commands based on his state
+For example if you are not Authenticated you can only send a PASS command.
+Only when a user send us the correct password, and registered (meaning that it has a unique nickname and a username) it has
+access to the full set of commands. 

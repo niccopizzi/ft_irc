@@ -120,6 +120,11 @@ void Server::pollEvents()
     int ret;
 
     ret = poll(polls.data(), polls.size(), EVENT_TIMEOUT_TIME);
+    if (ret == POLL_TIMEOUT_RET_VAL)
+    {
+        checkForTimeouts();
+        return;
+    }
     if (ret == -1)
         throw(std::runtime_error("Poll error"));
     for (size_t i = 0; i < polls.size(); i++)
@@ -396,6 +401,7 @@ void Server::deregisterConnection(Connection &client)
     #ifdef LOG
         logger->logConnection("connection closed", client.getConnectionId());
     #endif
+    //client.getPollFd()->fd = -1;
     nickToConnection.erase(clientNickname);
     fdToConnection.erase(clientfd);
     it = connections.begin();

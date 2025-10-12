@@ -11,10 +11,10 @@ SRC =		$(SRC_DIR)main.cpp								\
 			$(SRC_DIR)replies/Replies.cpp					\
 			$(SRC_DIR)server/Server.cpp 					\
 			$(SRC_DIR)server/Listener.cpp					\
-			$(SRC_DIR)server/Connection.cpp 				\
+			$(SRC_DIR)connection/Connection.cpp 			\
+			$(SRC_DIR)connection/User.cpp					\
 			$(SRC_DIR)start_func/args_check.cpp				\
 			$(SRC_DIR)start_func/server_start.cpp			\
-			$(SRC_DIR)user/User.cpp							\
 			$(SRC_DIR)signals/signals.cpp					\
 			$(SRC_DIR)logger/Logger.cpp						\
 
