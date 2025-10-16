@@ -1,7 +1,7 @@
 #ifndef BENDER_HPP
 #define BENDER_HPP
 
-#include "../server/Server.hpp"
+#include "Server.hpp"
 #include "./infochan/ChannelInfo.hpp"
 
 #include <sstream>

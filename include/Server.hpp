@@ -17,7 +17,7 @@
 
 #define HOSTNAME "Sambatime"
 #define EVENT_TIMEOUT_TIME (1000)   // (ms) timeout every second
-#define TIMEOUT_TIME (60)           // (s) timeout after 1 minute of inactivity
+#define TIMEOUT_TIME (600)          // (s) timeout after 1 minute of inactivity
 #define POLL_TIMEOUT_RET_VAL 0
 
 class Server

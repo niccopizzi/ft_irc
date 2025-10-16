@@ -50,33 +50,6 @@ Bender::~Bender()
     }
 }
 
-void Bender::printBender() const
-{
-    std::cout << "Channels on Server \n";
-    for (std::set<std::string>::const_iterator it = channelsOnServer.begin(); it != channelsOnServer.end(); ++it)
-    {
-        std::cout << "Channel name : " << *it <<"\n";
-    }
-    std::cout << "Channels operated\n";
-    for (std::set<std::string>::const_iterator it = channelsOperated.begin(); it != channelsOperated.end(); ++it)
-    {
-        std::cout << "Channel name : " << *it << "\n";
-    }
-    std::cout << "Channels info\n";
-    for (std::map<std::string, ChannelInfo*>::const_iterator it = channelsJoined.begin(); it != channelsJoined.end(); ++it)
-    {
-        std::cout << "Printing info for " << it->first << "\n";
-        for (std::map<std::string, UserStat>::const_iterator st = it->second->getStats().begin(); st != it->second->getStats().end();
-            ++st)
-        {
-            std::cout << st->first << " stats :\n";
-            std::cout << "\tInteractions : " << st->second.interactions << "\n";
-            std::cout << "\tLast seen    : " << st->second.lastSeen << "\n";
-        }
-    }
-}
-
-
 void Bender::connectToServer()
 {
     addrinfo    hints;
@@ -127,7 +100,6 @@ void Bender::pollEvents()
         dequeueMsg();
     else if (connectionPoll.revents & POLLIN)
         handleServerReply();
-    //printBender();
 }
 
 bool    endLineReceived(std::string& message)
