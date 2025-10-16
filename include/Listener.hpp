@@ -1,7 +1,11 @@
-#ifndef LISTENER_HPP
-#define LISTENER_HPP
+#pragma once
 
 #include "Connection.hpp"
+
+/*
+ * Listener is a wrapper around a server socket that encapsulates creating,
+ * binding, listening and accepting incoming TCP connections.
+ */
 
 class Listener
 {
@@ -24,10 +28,7 @@ public:
     void            startListen(int queue) const;
     int             getSocketFd() const;
     const char*     getPort() const;
-    void            setNonBlockState(bool nonBlock);
     void            setSocketFd(int fd);
 
     Connection      acceptConnection();
 };
-
-#endif // LISTENER.HPP

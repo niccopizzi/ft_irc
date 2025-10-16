@@ -46,10 +46,17 @@ Listener::~Listener()
         std::cout << "Listener destructor called\n";
     #endif
 }
-void            Listener::createSocket(int ai_family, int ai_socktype)
+
+/*
+ * Prepares server socket for listening, resolves the address, creates socket,
+ * sets options and binds to desired port.
+ * hints is a struct that contains info about connection
+ * setsockopt() allows reuse of address.
+ */
+void    Listener::createSocket(int ai_family, int ai_socktype)
 {
     int                 err;
-    int                 yes = 1;
+    int                 sockoOptRet = 1;
     struct addrinfo*    info;
     struct addrinfo*    it;
     struct addrinfo     hints;
@@ -66,7 +73,7 @@ void            Listener::createSocket(int ai_family, int ai_socktype)
         socketFd = socket(it->ai_family, it->ai_socktype | SOCK_NONBLOCK, it->ai_protocol);
         if (socketFd == -1)
             continue;
-        setsockopt(socketFd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int));
+        setsockopt(socketFd, SOL_SOCKET, SO_REUSEADDR, &sockoOptRet, sizeof(int)); // can reuse address to avoid "address already in use"
         if (bind(socketFd, it->ai_addr, it->ai_addrlen) == 0)
             break;
     }
@@ -76,7 +83,10 @@ void            Listener::createSocket(int ai_family, int ai_socktype)
         throw std::runtime_error("Could not bind to any socket");
 }
 
-void            Listener::startListen(int queue) const
+/*
+ * Prepares to accept connections on socket FD.
+ */
+void    Listener::startListen(int queue) const
 {
     if (socketFd == -1)
         return;
@@ -86,7 +96,7 @@ void            Listener::startListen(int queue) const
         std::cout << "Listening on port " << port << '\n';
     #endif
 }
-int             Listener::getSocketFd() const
+int Listener::getSocketFd() const
 {
     return (socketFd);
 }
@@ -96,17 +106,7 @@ const char*     Listener::getPort() const
     return (port);
 }
 
-void            Listener::setNonBlockState(bool nonBlock)
-{
-    int flags = fcntl(socketFd, F_GETFL, 0);
-
-    if (nonBlock)
-        fcntl(socketFd, F_SETFL, flags | O_NONBLOCK);
-    else
-        fcntl(socketFd, F_SETFL, flags & (~O_NONBLOCK));
-}
-
-void            Listener::setSocketFd(int fd)
+void    Listener::setSocketFd(int fd)
 {
     socketFd = fd;
 }
@@ -116,7 +116,13 @@ bool    Listener::isOpen() const
     return (socketFd != -1);
 }
 
-Connection      Listener::acceptConnection() 
+/*
+ * Waits for incoming client connection on listening socket then returns a new
+ * connection object for it.
+ * Calls accept on listening socket.
+ * Sets blocking mode of new socket.
+ */
+Connection  Listener::acceptConnection() 
 {
     int                     newFd;
     struct sockaddr_storage s;
@@ -124,7 +130,7 @@ Connection      Listener::acceptConnection()
 
     addrlen = sizeof(s);
     newFd = accept(socketFd, (struct sockaddr*)&s, &addrlen);
-    if (newFd == -1) //cannot accept more connections from this socket, stop listening
+    if (newFd == -1) // cannot accept more connections from this socket, stop listening
     {
         close(socketFd);
         socketFd = -1;

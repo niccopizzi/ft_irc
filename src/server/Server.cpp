@@ -3,16 +3,12 @@
 Server::Server() : listener(),
                    password(""),
                    currentId(1)
-{
-    polls.reserve(50);
-}
+{ polls.reserve(50);}
 
 Server::Server(const char *port, const char *password) : listener(port),
                                                          password(password),
                                                          currentId(1)
-{
-    polls.reserve(50);
-}
+{ polls.reserve(50); }
 
 Server::Server(const Server &server) : listener(server.listener),
                                        password(server.password),
@@ -22,9 +18,7 @@ Server::Server(const Server &server) : listener(server.listener),
                                        fdToConnection(server.fdToConnection),
                                        nickToConnection(server.nickToConnection),
                                        currentId(server.currentId)
-{
-
-}
+{}
 
 Server &Server::operator=(const Server &other)
 {
@@ -58,37 +52,30 @@ Server::~Server()
 #endif
 }
 
-const Listener &Server::getListener() const
-{
-    return (listener);
-}
+const Listener &Server::getListener() const { return (listener); }
 
 const std::list<Connection> &Server::getConnections() const
-{
-    return (connections);
-}
+{ return (connections); }
 
-const std::vector<pollfd> &Server::getPolls() const
-{
-    return (polls);
-}
+const std::vector<pollfd> &Server::getPolls() const { return (polls); }
 
 const std::map<const std::string, Connection *> &Server::getNicksMap() const
-{
-    return (nickToConnection);
-}
+{ return (nickToConnection); }
 
 const std::map<int, Connection *> &Server::getFdMap() const
-{
-    return (fdToConnection);
-}
+{ return (fdToConnection); }
 
+/*
+ * Opens listening TCP socket and registers it as first entry in polls array.
+ * Binds/listens on it with system max backlog.
+ * Builds a pollfd for that listener and registers it as an event source.
+ */
 void Server::openPort()
 {
     pollfd listenerpoll;
 
-    listener.createSocket(AF_UNSPEC, SOCK_STREAM);
-    listener.startListen(SOMAXCONN);
+    listener.createSocket(AF_UNSPEC, SOCK_STREAM); // SOCK_STREAM is stream-oriented socket that TCP uses
+    listener.startListen(SOMAXCONN); // max
     listenerpoll.fd = listener.getSocketFd();
     listenerpoll.events = POLLIN;
     listenerpoll.revents = 0;
@@ -115,11 +102,20 @@ void Server::checkForTimeouts()
     }
 }
 
+/*
+ * Main loop that keeps IRC server running, accepting new connections and handling
+ * client communication.
+ * Polling is the POSIX system call to wait for 1 or more FDs to update.
+ * Uses POSIX poll() system call to monitor multiple FDs (listening socket
+ * and all connected client sockets).
+ * polls is a vector of pollfd structs, each representing a socket. First is listening
+ * socket and the rest are client sockets.
+ */
 void Server::pollEvents()
 {
     int ret;
 
-    ret = poll(polls.data(), polls.size(), EVENT_TIMEOUT_TIME);
+    ret = poll(polls.data(), polls.size(), EVENT_TIMEOUT_TIME); // blocks until >= 1 fds are ready
     if (ret == POLL_TIMEOUT_RET_VAL)
     {
         checkForTimeouts();
@@ -129,9 +125,11 @@ void Server::pollEvents()
         throw(std::runtime_error("Poll error"));
     for (size_t i = 0; i < polls.size(); i++)
     {
-        if (polls.at(i).revents != 0) //io event happened on fd
+        // .at() is safer [] index operator
+        if (polls.at(i).revents != 0) // io event happened on fd
         {
-            if (i == 0) //the first poll is the server listener and the rest are clients connection
+            // new client connection
+            if (i == 0) // the first poll is the server listener and the rest are clients connection
                 createConnection();
             else
                 handleClientInteraction(polls.at(i));
@@ -140,11 +138,16 @@ void Server::pollEvents()
     checkForTimeouts();
 }
 
+/*
+ * This handles interaction from clients (not listening socket).
+ */
 void Server::handleClientInteraction(pollfd &activePoll)
 {
     int res;
+    // lookup corresponding connection
     Connection &client = *fdToConnection.find(activePoll.fd)->second;
 
+    // hangup
     if (activePoll.events & POLLHUP)
     {
     #ifdef LOG
@@ -154,6 +157,7 @@ void Server::handleClientInteraction(pollfd &activePoll)
         removeConnection(client);
     }
     client.updateTimeOfLastInteraction();
+    // POLLOUT is writeable, send any queued messages to client or handle error
     if (activePoll.events & POLLOUT)
     {
         res = client.dequeueMsg();
@@ -168,10 +172,11 @@ void Server::handleClientInteraction(pollfd &activePoll)
             #endif
         }
     }
+    // checks POLLIN mask, call handleClientMsg() to read data from client.
     else if (activePoll.events & POLLIN)
     {
         res = client.handleClientMsg();
-        if (res == BUFFER_FULL) //buffer here is cleared, send msg to client with error (https://modern.ircdocs.horse/#errinputtoolong-417)
+        if (res == BUFFER_FULL) // buffer here is cleared, send msg to client with error (https://modern.ircdocs.horse/#errinputtoolong-417)
             client.enqueueMsg(":localhost 417 :Input line was too long\r\n");    
         else if (res == READ_ERROR)
         {
@@ -198,6 +203,9 @@ void Server::handleClientInteraction(pollfd &activePoll)
     }
 }
 
+/*
+ * Parses client command using a string stream
+ */
 void Server::handleClientCommand(Connection &client, const std::string &msg)
 {
     std::stringstream ss(msg);
@@ -214,15 +222,15 @@ void Server::handleClientCommand(Connection &client, const std::string &msg)
     while (std::getline(ss, line))
     {
         if (!std::isalpha(*line.begin()))
-            return; //silently fail if line does not start with a char
+            return; // silently fail if line does not start with a char. IRC commands must start with a char
         if (*(line.end() - 1) == '\r')
             line.erase((line.end() - 1));
         pos = line.find(' ');
-        if (pos != std::string::npos) //split args only if space is present
+        if (pos != std::string::npos) // split args only if space is present
         {
             cmd = line.substr(0, pos);
             split(&(line.at(pos)), ' ', args);
-            if (args.empty()) //handle case where after command there are only spaces and no args
+            if (args.empty()) // handle case where after command there are only spaces and no args
                 handleSimpleCommand(client, cmd, NULL);
             else
                 handleSimpleCommand(client, cmd, &args);
@@ -241,31 +249,35 @@ void Server::handleSimpleCommand(Connection &client,
 {
 #ifdef LOG
     if (args)
-    {
         logger->logCommand(cmd, catArguments(args->begin(), args->end()), client.getConnectionId());
-    }
     else
         logger->logCommand(cmd, "empty", client.getConnectionId());
 #endif
+
     if (cmd == "CAP")
         return;
+
+    if (cmd == "QUIT") {
+        if (client.isRegistered())
+            notifyQuit(getReason(args), client);
+        client.enqueueMsg("ERROR :You quit\r\n");
+        return;
+    }
+
+    // Only allow these commands if client is not registered
+    if (!client.isRegistered() && cmd != "NICK" && cmd != "PASS" && cmd != "USER")
+    {
+        client.enqueueMsg(Replies::CommonErr(client.getNickname(), "", ERR_NOTREGISTERED));
+        return;
+    }
+
+    // Command dispatch
     if (cmd == "NICK")
         CommandHandler::executeNick(args, client, nickToConnection, channels);
     else if (cmd == "USER")
         CommandHandler::executeUsername(args, client);
     else if (cmd == "PASS")
         CommandHandler::executePass(args, client, password);
-    else if (cmd == "QUIT")
-    {
-        if (client.isRegistered())
-            notifyQuit(getReason(args), client);
-        client.enqueueMsg("ERROR :You quit\r\n");
-    }
-    else if (!client.isRegistered()) // block here to prevent non registered clients from executing commands below
-    {
-        client.enqueueMsg(Replies::CommonErr(client.getNickname(), "", ERR_NOTREGISTERED));
-        return;
-    }
     else if (cmd == "JOIN")
         CommandHandler::executeJoin(args, client, channels);
     else if (cmd == "PING")
@@ -286,17 +298,18 @@ void Server::handleSimpleCommand(Connection &client,
         CommandHandler::executeWho(args, client, channels);
 }
 
-
+/*
+ * Assigns new or recycled pollfd to a new client.
+ */
 bool Server::assignPollToConnection(Connection &newConnection)
 {
     size_t  needToReallocate;
     std::vector<pollfd>::iterator end(polls.end());
     pollfd  newPoll;
 
-    
     for (std::vector<pollfd>::iterator it = polls.begin() + 1; it != end; ++it)
     {
-        if (it->fd == -1) //unusued poll, assign this one to the Connection instead of creating a new one
+        if (it->fd == -1) // unusued poll, assign this one to the Connection instead of creating a new one
         {
             it->fd = newConnection.getFd();
             it->events = POLLIN;
@@ -306,7 +319,8 @@ bool Server::assignPollToConnection(Connection &newConnection)
             return (false);
         }
     }
-    needToReallocate = (polls.capacity() <= (polls.size() + 1));
+    // if new pollfd must be created
+    needToReallocate = (polls.capacity() <= (polls.size() + 1)); // check if reallocation is necessary
     newPoll.fd = newConnection.getFd();
     newPoll.events = POLLIN;
     newPoll.revents = 0;
@@ -317,11 +331,14 @@ bool Server::assignPollToConnection(Connection &newConnection)
     return (needToReallocate);
 }
 
+/*
+ * In the event of reallocation, new pointers need to be stored
+ */
 void Server::registerConnection(Connection &newConnection)
 {
     std::vector<pollfd>::iterator end;
     bool    reallocationHappened;
-    
+
     reallocationHappened = assignPollToConnection(newConnection);
     if (reallocationHappened) // reallocation happened need to store the new pointers, skip the first one because is reserved for the server listener
     {
@@ -334,15 +351,19 @@ void Server::registerConnection(Connection &newConnection)
     }
 }
 
+/*
+ * Accepts new client, wraps it in a Connection, assigns it ID, registers for
+ * event monitoring and handles errors.
+ */
 void Server::createConnection()
 {
     if (!listener.isOpen())
         return;
-        
+
     try
     {
         Connection newConnection(listener.acceptConnection());
-        
+
         newConnection.setId(currentId);
         #ifdef LOG
             logger->logConnection("registered new connection", currentId);
@@ -390,6 +411,10 @@ void Server::removeClientFromChannels(connectionID clientId)
     }
 }
 
+/*
+ * When client disconnects, all references to them are removed, resources are
+ * released and the server is ready to handle new connections. Clean up.
+ */
 void Server::deregisterConnection(Connection &client)
 {
     std::list<Connection>::iterator it;
@@ -401,7 +426,7 @@ void Server::deregisterConnection(Connection &client)
     #ifdef LOG
         logger->logConnection("connection closed", client.getConnectionId());
     #endif
-    //client.getPollFd()->fd = -1;
+    // client.getPollFd()->fd = -1;
     nickToConnection.erase(clientNickname);
     fdToConnection.erase(clientfd);
     it = connections.begin();
@@ -447,8 +472,5 @@ void Server::notifyQuit(const std::string &reason, const Connection &client) con
 }
 
 #ifdef LOG
-void Server::setLogger(Logger* theLogger)
-{
-    logger = theLogger;
-}
+void Server::setLogger(Logger* theLogger) { logger = theLogger; }
 #endif
